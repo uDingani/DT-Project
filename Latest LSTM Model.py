@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import pandas as pd
 import numpy as np
 from tensorflow.keras.models import load_model
@@ -7,11 +6,13 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import pickle
 import sys
+import os
 
 # Load the model
 try:
     model = load_model('C:/Users/Busiso/Documents/GitHub/DT-Project/trained_strain_gauge_model.h5')
     print("Model loaded successfully.")
+    print("Expected input shape:", model.input_shape)
 except FileNotFoundError:
     print("Error: Model file 'trained_strain_gauge_model.h5' not found!")
     sys.exit()
@@ -24,6 +25,7 @@ try:
     train_data = pd.read_csv('C:/Users/Busiso/Desktop/EXCEL FILES/SUCCESSFUL/Success.csv')
     print("Training data loaded successfully.")
     print("Columns in train_data:", train_data.columns.tolist())
+    print("First 5 rows of train_data:\n", train_data.head())
 except FileNotFoundError:
     print("Error: Training data file 'Success.csv' not found!")
     sys.exit()
@@ -31,39 +33,51 @@ except Exception as e:
     print(f"Error loading training data: {e}")
     sys.exit()
 
+# Standardize column names to lowercase
+train_data.columns = train_data.columns.str.lower().str.strip()
+
 # Load new data
-try:
-    new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.xlsx')
-    print("New data loaded successfully.")
-    print("Columns in new_data:", new_data.columns.tolist())
-except FileNotFoundError:
-    print("Error: Data file '60_G1_successful.xlsx' not found!")
+file_path = 'C:/Users/Busiso/Desktop/60_G1_successful.xlsx'
+if not os.path.exists(file_path):
+    print(f"Error: File '{file_path}' does not exist!")
     sys.exit()
+try:
+    new_data = pd.read_excel(file_path)
+    print("New data loaded successfully as Excel.")
 except Exception as e:
-    print(f"Error loading data: {e}")
+    print(f"Failed to load as Excel: {e}")
     sys.exit()
 
+# Standardize new data column names
+new_data.columns = new_data.columns.str.lower().str.strip()
+print("Columns in new_data:", new_data.columns.tolist())
+
 # Verify required columns
-required_cols = ['Time', 'Voltage']  # Adjust these based on actual column names
+required_cols = ['time', 'voltage']
 missing_cols = [col for col in required_cols if col not in new_data.columns]
 if missing_cols:
     raise ValueError(f"Missing required columns in new_data: {missing_cols}")
 
 # Extract time and voltage
-time = new_data['Time'].values
-voltage = new_data['Voltage'].values
+time = new_data['time'].values
+voltage = new_data['voltage'].values
 
-# Feature engineering for training data
-train_data['Voltage_Diff'] = train_data['Voltage'].diff().fillna(0)
-train_data['Rolling_Mean'] = train_data['Voltage'].rolling(window=10).mean().fillna(method='bfill')
-train_data['Rolling_Std'] = train_data['Voltage'].rolling(window=10).std().fillna(method='bfill')
-train_features = ['Voltage', 'Voltage_Diff', 'Rolling_Mean', 'Rolling_Std']
+# Feature engineering
+train_data['voltage_diff'] = train_data['voltage'].diff().fillna(0)
+train_data['rolling_mean'] = train_data['voltage'].rolling(window=10).mean().bfill()
+train_data['rolling_std'] = train_data['voltage'].rolling(window=10).std().bfill()
+
+new_data['voltage_diff'] = new_data['voltage'].diff().fillna(0)
+new_data['rolling_mean'] = new_data['voltage'].rolling(window=10).mean().bfill()
+new_data['rolling_std'] = new_data['voltage'].rolling(window=10).std().bfill()
+
+# Check model's expected input features
+train_features = ['voltage', 'voltage_diff', 'rolling_mean', 'rolling_std']
+if model.input_shape[-1] == 1:
+    train_features = ['voltage']  # Reduce features if model expects a single input
+    print("Using only 'voltage' as input feature.")
+
 train_X = train_data[train_features]
-
-# Feature engineering for new data
-new_data['Voltage_Diff'] = new_data['Voltage'].diff().fillna(0)
-new_data['Rolling_Mean'] = new_data['Voltage'].rolling(window=10).mean().fillna(method='bfill')
-new_data['Rolling_Std'] = new_data['Voltage'].rolling(window=10).std().fillna(method='bfill')
 new_X = new_data[train_features]
 
 # Create sequences
@@ -76,6 +90,7 @@ def create_sequences(X, time_steps=50):
 time_steps = 50
 train_X_seq = create_sequences(train_X, time_steps)
 new_X_seq = create_sequences(new_X, time_steps)
+
 print("train_X_seq shape:", train_X_seq.shape)
 print("new_X_seq shape:", new_X_seq.shape)
 
@@ -95,6 +110,7 @@ except Exception as e:
     print(f"Error scaling new data: {e}")
     sys.exit()
 
+# Reshape to match LSTM input
 new_X_scaled = new_X_scaled.reshape((new_X_scaled.shape[0], time_steps, new_X_scaled.shape[2]))
 
 # Make predictions
