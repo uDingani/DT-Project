@@ -12,11 +12,8 @@ import pickle
 model = load_model('C:/Users/Busiso/Desktop/failure_predictor_model.h5')
 
 
-with open('C:/Users/Busiso/Desktop/scaler.pkl', 'rb') as f:
-    scaler = pickle.load(f)
 
-
-new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.xlsx') 
+new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.csv') 
 time = new_data['Time'].values
 voltage = new_data['Voltage'].values  
 
