@@ -9,7 +9,7 @@ import pickle
 
 # Load the pre-trained model with error handling
 try:
-    model = load_model('C:/Users/Busiso/Desktop/failure_predictor_model.h5')
+    model = load_model('C:/Users/Busiso/Desktop/')
     print("Model loaded successfully.")
 except FileNotFoundError:
     print("Error: Model file 'failure_predictor_model.h5' not found!")
@@ -18,22 +18,21 @@ except Exception as e:
     print(f"Error loading model: {e}")
     exit()
 
-# Load the scaler (assumed to be saved during training)
+# Load training data to fit the scaler
 try:
-    with open('C:/Users/Busiso/Desktop/scaler.pkl', 'rb') as f:
-        scaler = pickle.load(f)
-    print("Scaler loaded successfully.")
+    train_data = pd.read_csv('C:/Users/Busiso/Desktop/training_data.csv')  # Adjust path/format if needed
+    print("Training data loaded successfully.")
 except FileNotFoundError:
-    print("Error: Scaler file 'scaler.pkl' not found! You need to load or fit a scaler.")
+    print("Error: Training data file 'training_data.csv' not found!")
     exit()
 except Exception as e:
-    print(f"Error loading scaler: {e}")
+    print(f"Error loading training data: {e}")
     exit()
 
 # Load new data
 try:
     new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.csv')
-    print("Data loaded successfully.")
+    print("New data loaded successfully.")
 except FileNotFoundError:
     print("Error: Data file '60_G1_successful.csv' not found!")
     exit()
@@ -41,38 +40,55 @@ except Exception as e:
     print(f"Error loading data: {e}")
     exit()
 
-# Extract time and voltage
+# Extract time and voltage from new data
 time = new_data['Time'].values
 voltage = new_data['Voltage'].values  
 
+# Feature engineering for training data
+train_data['Voltage_Diff'] = train_data['Voltage'].diff().fillna(0)
+train_data['Rolling_Mean'] = train_data['Voltage'].rolling(window=10).mean().fillna(method='bfill')
+train_data['Rolling_Std'] = train_data['Voltage'].rolling(window=10).std().fillna(method='bfill')
+train_features = ['Voltage', 'Voltage_Diff', 'Rolling_Mean', 'Rolling_Std']
+train_X = train_data[train_features]
 
+# Feature engineering for new data
 new_data['Voltage_Diff'] = new_data['Voltage'].diff().fillna(0)
 new_data['Rolling_Mean'] = new_data['Voltage'].rolling(window=10).mean().fillna(method='bfill')
 new_data['Rolling_Std'] = new_data['Voltage'].rolling(window=10).std().fillna(method='bfill')
-features = ['Voltage', 'Voltage_Diff', 'Rolling_Mean', 'Rolling_Std']
-new_X = new_data[features]
+new_X = new_data[train_features]  # Use same features as training
 
-
+# Function to create sequences
 def create_sequences(X, time_steps=50):
     Xs = []
     for i in range(len(X) - time_steps):
         Xs.append(X.iloc[i:(i + time_steps)].values)
     return np.array(Xs)
 
-
+# Create sequences for training and new data
 time_steps = 50
+train_X_seq = create_sequences(train_X, time_steps)
 new_X_seq = create_sequences(new_X, time_steps)
+print("train_X_seq shape:", train_X_seq.shape)
 print("new_X_seq shape:", new_X_seq.shape)
 
+# Fit scaler to training data
+scaler = StandardScaler()
+try:
+    scaler.fit(train_X_seq.reshape(-1, train_X_seq.shape[2]))
+    print("Scaler fitted to training data.")
+except Exception as e:
+    print(f"Error fitting scaler: {e}")
+    exit()
 
+# Transform new data using the fitted scaler
 try:
     new_X_scaled = scaler.transform(new_X_seq.reshape(-1, new_X_seq.shape[2])).reshape(new_X_seq.shape)
     print("new_X_scaled shape:", new_X_scaled.shape)
 except Exception as e:
-    print(f"Error scaling data: {e}")
+    print(f"Error scaling new data: {e}")
     exit()
 
-
+# Make predictions
 try:
     predictions = model.predict(new_X_scaled)
     print("Predictions shape:", predictions.shape)
@@ -105,3 +121,8 @@ plt.show()
 # Output results
 print(f"Number of reliable points: {len(reliable_indices)} out of {len(voltage)}")
 print(f"Sample reliable strain values: {reliable_strain[:5]}")
+
+# Save the scaler for future use
+with open('C:/Users/Busiso/Desktop/reconstructed_scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+print("Scaler saved as 'reconstructed_scaler.pkl'.")
