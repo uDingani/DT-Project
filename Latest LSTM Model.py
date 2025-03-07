@@ -7,34 +7,34 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import pickle
 
-# Load the pre-trained model with error handling
+ 
 try:
-    model = load_model('C:/Users/Busiso/Desktop/')
+    model = load_model('C:/Users/Busiso/Documents/GitHub/DT-Project/trained_strain_gauge_model.h5')
     print("Model loaded successfully.")
 except FileNotFoundError:
-    print("Error: Model file 'failure_predictor_model.h5' not found!")
+    print("Error: Model file 'trained_strain_gauge_model.h5' not found!")
     exit()
 except Exception as e:
     print(f"Error loading model: {e}")
     exit()
 
-# Load training data to fit the scaler
+
 try:
-    train_data = pd.read_csv('C:/Users/Busiso/Desktop/training_data.csv')  # Adjust path/format if needed
+    train_data = pd.read_csv('C:/Users/Busiso/Desktop/EXCEL FILES/SUCCESSFUL/Success.csv')  
     print("Training data loaded successfully.")
 except FileNotFoundError:
-    print("Error: Training data file 'training_data.csv' not found!")
+    print("Error: Training data file 'Success.csv' not found!")
     exit()
 except Exception as e:
     print(f"Error loading training data: {e}")
     exit()
 
-# Load new data
+
 try:
-    new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.csv')
+    new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.xlsx')
     print("New data loaded successfully.")
 except FileNotFoundError:
-    print("Error: Data file '60_G1_successful.csv' not found!")
+    print("Error: Data file '60_G1_successful.xlsx' not found!")
     exit()
 except Exception as e:
     print(f"Error loading data: {e}")
