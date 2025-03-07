@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 import pickle
 import sys
 
-
+# Load the model
 try:
     model = load_model('C:/Users/Busiso/Documents/GitHub/DT-Project/trained_strain_gauge_model.h5')
     print("Model loaded successfully.")
@@ -19,10 +19,11 @@ except Exception as e:
     print(f"Error loading model: {e}")
     sys.exit()
 
-
+# Load training data
 try:
-    train_data = pd.read_csv('C:/Users/Busiso/Desktop/EXCEL FILES/SUCCESSFUL/Success.csv')  
+    train_data = pd.read_csv('C:/Users/Busiso/Desktop/EXCEL FILES/SUCCESSFUL/Success.csv')
     print("Training data loaded successfully.")
+    print("Columns in train_data:", train_data.columns.tolist())
 except FileNotFoundError:
     print("Error: Training data file 'Success.csv' not found!")
     sys.exit()
@@ -30,10 +31,11 @@ except Exception as e:
     print(f"Error loading training data: {e}")
     sys.exit()
 
-
+# Load new data
 try:
     new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.xlsx')
     print("New data loaded successfully.")
+    print("Columns in new_data:", new_data.columns.tolist())
 except FileNotFoundError:
     print("Error: Data file '60_G1_successful.xlsx' not found!")
     sys.exit()
@@ -41,30 +43,35 @@ except Exception as e:
     print(f"Error loading data: {e}")
     sys.exit()
 
+# Verify required columns
+required_cols = ['Time', 'Voltage']  # Adjust these based on actual column names
+missing_cols = [col for col in required_cols if col not in new_data.columns]
+if missing_cols:
+    raise ValueError(f"Missing required columns in new_data: {missing_cols}")
 
+# Extract time and voltage
 time = new_data['Time'].values
-voltage = new_data['Voltage'].values  
+voltage = new_data['Voltage'].values
 
-
+# Feature engineering for training data
 train_data['Voltage_Diff'] = train_data['Voltage'].diff().fillna(0)
 train_data['Rolling_Mean'] = train_data['Voltage'].rolling(window=10).mean().fillna(method='bfill')
 train_data['Rolling_Std'] = train_data['Voltage'].rolling(window=10).std().fillna(method='bfill')
 train_features = ['Voltage', 'Voltage_Diff', 'Rolling_Mean', 'Rolling_Std']
 train_X = train_data[train_features]
 
-
+# Feature engineering for new data
 new_data['Voltage_Diff'] = new_data['Voltage'].diff().fillna(0)
 new_data['Rolling_Mean'] = new_data['Voltage'].rolling(window=10).mean().fillna(method='bfill')
 new_data['Rolling_Std'] = new_data['Voltage'].rolling(window=10).std().fillna(method='bfill')
-new_X = new_data[train_features]  # Use same features as training
+new_X = new_data[train_features]
 
-
+# Create sequences
 def create_sequences(X, time_steps=50):
     Xs = []
     for i in range(len(X) - time_steps):
         Xs.append(X.iloc[i:(i + time_steps)].values)
     return np.array(Xs)
-
 
 time_steps = 50
 train_X_seq = create_sequences(train_X, time_steps)
@@ -72,7 +79,7 @@ new_X_seq = create_sequences(new_X, time_steps)
 print("train_X_seq shape:", train_X_seq.shape)
 print("new_X_seq shape:", new_X_seq.shape)
 
-
+# Scale the data
 scaler = StandardScaler()
 try:
     scaler.fit(train_X_seq.reshape(-1, train_X_seq.shape[2]))
@@ -88,10 +95,9 @@ except Exception as e:
     print(f"Error scaling new data: {e}")
     sys.exit()
 
-
 new_X_scaled = new_X_scaled.reshape((new_X_scaled.shape[0], time_steps, new_X_scaled.shape[2]))
 
-
+# Make predictions
 try:
     predictions = model.predict(new_X_scaled)
     print("Predictions shape:", predictions.shape)
@@ -99,18 +105,18 @@ except Exception as e:
     print(f"Error during prediction: {e}")
     sys.exit()
 
-
+# Filter reliable points
 threshold = 0.5
 reliable_indices = [i + time_steps for i, pred in enumerate(predictions) if pred[0] <= threshold]
 
-
+# Calculate strain
 gauge_factor = 2.0
 excitation_voltage = 5.0
 strain = voltage / (gauge_factor * excitation_voltage)
 reliable_strain = strain[reliable_indices]
 reliable_time = time[reliable_indices]
 
-
+# Plot results
 plt.figure(figsize=(10, 5))
 plt.plot(time, strain, label="All Strain Data", alpha=0.5)
 plt.plot(reliable_time, reliable_strain, 'ro', label="Reliable Strain (Gauge Tight)")
@@ -121,11 +127,11 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-
+# Print results
 print(f"Number of reliable points: {len(reliable_indices)} out of {len(voltage)}")
 print(f"Sample reliable strain values: {reliable_strain[:5]}")
 
-
+# Save the scaler
 with open('C:/Users/Busiso/Desktop/reconstructed_scaler.pkl', 'wb') as f:
     pickle.dump(scaler, f)
 print("Scaler saved as 'reconstructed_scaler.pkl'.")
