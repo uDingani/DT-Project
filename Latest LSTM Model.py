@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import pickle
 
- 
+# Load model
 try:
     model = load_model('C:/Users/Busiso/Documents/GitHub/DT-Project/trained_strain_gauge_model.h5')
     print("Model loaded successfully.")
@@ -18,7 +18,7 @@ except Exception as e:
     print(f"Error loading model: {e}")
     exit()
 
-
+# Load training data
 try:
     train_data = pd.read_csv('C:/Users/Busiso/Desktop/EXCEL FILES/SUCCESSFUL/Success.csv')  
     print("Training data loaded successfully.")
@@ -29,9 +29,10 @@ except Exception as e:
     print(f"Error loading training data: {e}")
     exit()
 
-
+# Load new data
 try:
-    new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.xlsx')
+    new_data = pd.read_excel('C:/Users/Busiso/Desktop/60_G1_successful.xlsx', header=0)
+    new_data.columns = new_data.columns.str.strip()  # Remove extra spaces
     print("New data loaded successfully.")
 except FileNotFoundError:
     print("Error: Data file '60_G1_successful.xlsx' not found!")
@@ -40,8 +41,25 @@ except Exception as e:
     print(f"Error loading data: {e}")
     exit()
 
-# Extract time and voltage from new data
-time = new_data['Time'].values
+# Debugging: Print available columns
+print("Columns in new_data:", new_data.columns)
+
+# Check for 'Time' column dynamically
+time_column = [col for col in new_data.columns if 'time' in col.lower()]
+if time_column:
+    time = new_data[time_column[0]].values
+    print(f"Using column '{time_column[0]}' for time data.")
+else:
+    print("Error: 'Time' column not found in new_data!")
+    print("Available columns:", new_data.columns)
+    exit()
+
+# Check for 'Voltage' column
+if 'Voltage' not in new_data.columns:
+    print("Error: 'Voltage' column not found in new_data!")
+    print("Available columns:", new_data.columns)
+    exit()
+
 voltage = new_data['Voltage'].values  
 
 # Feature engineering for training data
