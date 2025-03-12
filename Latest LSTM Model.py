@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 import pickle
 import sys
 import os
+import psutil
 
 # Load the model
 try:
@@ -52,44 +53,91 @@ except Exception as e:
 new_data.columns = new_data.columns.str.lower().str.strip()
 print("Columns in new_data:", new_data.columns.tolist())
 
-# Verify required columns
-required_cols = ['time', 'voltage']
-missing_cols = [col for col in required_cols if col not in new_data.columns]
-if missing_cols:
-    raise ValueError(f"Missing required columns in new_data: {missing_cols}")
+# Identify time and voltage columns
+def identify_columns(df):
+    """Identify columns containing 'time' or 'voltage' in their names."""
+    time_cols = [col for col in df.columns if 'time' in col.lower()]
+    voltage_cols = [col for col in df.columns if 'voltage' in col.lower()]
+    return time_cols, voltage_cols
 
-# Extract time and voltage
-time = new_data['time'].values
-voltage = new_data['voltage'].values
+time_cols, voltage_cols = identify_columns(new_data)
+print(f"Detected time columns: {time_cols}")
+print(f"Detected voltage columns: {voltage_cols}")
+
+if len(time_cols) < 1 or len(voltage_cols) < 1:
+    raise ValueError("Could not find required time and/or voltage columns in the data")
+
+# Extract time
+time = new_data[time_cols[0]].values
+voltages = {col: new_data[col].values for col in voltage_cols}
 
 # Feature engineering
-train_data['voltage_diff'] = train_data['voltage'].diff().fillna(0)
-train_data['rolling_mean'] = train_data['voltage'].rolling(window=10).mean().bfill()
-train_data['rolling_std'] = train_data['voltage'].rolling(window=10).std().bfill()
+features = []
+for v_col in voltage_cols:
+    diff_col = f'{v_col}_diff'
+    mean_col = f'{v_col}_rolling_mean'
+    std_col = f'{v_col}_rolling_std'
+    
+    # Training data
+    train_data[diff_col] = train_data[v_col].diff().fillna(0)
+    train_data[mean_col] = train_data[v_col].rolling(window=10).mean().bfill()
+    train_data[std_col] = train_data[v_col].rolling(window=10).std().bfill()
+    
+    # New data
+    new_data[diff_col] = new_data[v_col].diff().fillna(0)
+    new_data[mean_col] = new_data[v_col].rolling(window=10).mean().bfill()
+    new_data[std_col] = new_data[v_col].rolling(window=10).std().bfill()
+    
+    features.extend([v_col, diff_col, mean_col, std_col])
 
-new_data['voltage_diff'] = new_data['voltage'].diff().fillna(0)
-new_data['rolling_mean'] = new_data['voltage'].rolling(window=10).mean().bfill()
-new_data['rolling_std'] = new_data['voltage'].rolling(window=10).std().bfill()
+# Add ratios and differences between voltage columns
+if len(voltage_cols) > 1:
+    for i in range(len(voltage_cols)):
+        for j in range(i + 1, len(voltage_cols)):
+            ratio_col = f'ratio_{voltage_cols[i]}_{voltage_cols[j]}'
+            diff_col = f'diff_{voltage_cols[i]}_{voltage_cols[j]}'
+            
+            # Training data
+            train_data[ratio_col] = train_data[voltage_cols[i]] / train_data[voltage_cols[j]]
+            train_data[diff_col] = train_data[voltage_cols[i]] - train_data[voltage_cols[j]]
+            
+            # New data
+            new_data[ratio_col] = new_data[voltage_cols[i]] / new_data[voltage_cols[j]]
+            new_data[diff_col] = new_data[voltage_cols[i]] - new_data[voltage_cols[j]]
+            
+            features.extend([ratio_col, diff_col])
 
-# Check model's expected input features
-train_features = ['voltage', 'voltage_diff', 'rolling_mean', 'rolling_std']
-if model.input_shape[-1] == 1:
-    train_features = ['voltage']  # Reduce features if model expects a single input
-    print("Using only 'voltage' as input feature.")
+train_X = train_data[features]
+new_X = new_data[features]
 
-train_X = train_data[train_features]
-new_X = new_data[train_features]
-
-# Create sequences
-def create_sequences(X, time_steps=50):
+# Create sequences with chunked processing
+def create_sequences_chunked(X, time_steps=50, chunk_size=10000):
+    """Create sequences for LSTM input in chunks to manage memory."""
     Xs = []
-    for i in range(len(X) - time_steps):
-        Xs.append(X.iloc[i:(i + time_steps)].values)
+    try:
+        for start in range(0, len(X) - time_steps, chunk_size):
+            end = min(start + chunk_size, len(X) - time_steps)
+            chunk_X = X.iloc[start:end + time_steps]
+            for i in range(len(chunk_X) - time_steps):
+                Xs.append(chunk_X.iloc[i:(i + time_steps)].values)
+            print(f"Processed chunk {start} to {end}")
+            print(f"Memory usage: {psutil.virtual_memory().percent}%")
+    except MemoryError:
+        print("Memory error occurred. Try reducing chunk_size or time_steps.")
+        raise
     return np.array(Xs)
 
 time_steps = 50
-train_X_seq = create_sequences(train_X, time_steps)
-new_X_seq = create_sequences(new_X, time_steps)
+chunk_size = 10000  # Adjust based on your system's memory capacity
+
+try:
+    print("Creating training sequences...")
+    train_X_seq = create_sequences_chunked(train_X, time_steps, chunk_size)
+    print("Creating new data sequences...")
+    new_X_seq = create_sequences_chunked(new_X, time_steps, chunk_size)
+except MemoryError:
+    print("Failed to create sequences. Consider reducing chunk_size or time_steps.")
+    sys.exit()
 
 print("train_X_seq shape:", train_X_seq.shape)
 print("new_X_seq shape:", new_X_seq.shape)
@@ -125,10 +173,10 @@ except Exception as e:
 threshold = 0.5
 reliable_indices = [i + time_steps for i, pred in enumerate(predictions) if pred[0] <= threshold]
 
-# Calculate strain
+# Calculate strain (using first voltage column as representative)
 gauge_factor = 2.0
 excitation_voltage = 5.0
-strain = voltage / (gauge_factor * excitation_voltage)
+strain = voltages[voltage_cols[0]] / (gauge_factor * excitation_voltage)
 reliable_strain = strain[reliable_indices]
 reliable_time = time[reliable_indices]
 
@@ -144,7 +192,7 @@ plt.grid(True)
 plt.show()
 
 # Print results
-print(f"Number of reliable points: {len(reliable_indices)} out of {len(voltage)}")
+print(f"Number of reliable points: {len(reliable_indices)} out of {len(strain)}")
 print(f"Sample reliable strain values: {reliable_strain[:5]}")
 
 # Save the scaler
