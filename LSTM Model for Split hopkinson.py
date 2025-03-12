@@ -14,11 +14,10 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import joblib
-
+import psutil
 
 successful_file = 'C:/Users/Busiso/Desktop/hanna results/60_G1_successful.xlsx'
 failed_file = 'C:/Users/Busiso/Desktop/hanna results/60PSI_G1_failed.xlsx'
-
 
 try:
     successful_data = pd.read_excel(successful_file)
@@ -27,11 +26,9 @@ except FileNotFoundError as e:
     print(f"Error loading files: {e}")
     exit(1)
 
-
 successful_data['Label'] = 0
 failed_data['Label'] = 1
 all_data = pd.concat([successful_data, failed_data], ignore_index=True)
-
 
 def identify_columns(df):
     """Identify columns containing 'time' or 'voltage' in their names."""
@@ -46,7 +43,6 @@ print(f"Detected voltage columns: {voltage_cols}")
 if len(voltage_cols) < 1 or len(time_cols) < 1:
     raise ValueError("Could not find required time and/or voltage columns in the data")
 
-
 features = []
 for v_col in voltage_cols:
     diff_col = f'{v_col}_Diff'
@@ -58,7 +54,6 @@ for v_col in voltage_cols:
     all_data[std_col] = all_data[v_col].rolling(window=10).std().fillna(method='bfill')
     
     features.extend([v_col, diff_col, mean_col, std_col])
-
 
 if len(voltage_cols) > 1:
     for i in range(len(voltage_cols)):
@@ -72,18 +67,33 @@ if len(voltage_cols) > 1:
 X = all_data[features]
 y = all_data['Label']
 
-
-def create_sequences(X, y, time_steps=50):
-    """Create sequences for LSTM input."""
+def create_sequences_chunked(X, y, time_steps=50, chunk_size=10000):
+    """Create sequences for LSTM input in chunks to manage memory."""
     Xs, ys = [], []
-    for i in range(len(X) - time_steps):
-        Xs.append(X.iloc[i:(i + time_steps)].values)
-        ys.append(y.iloc[i + time_steps])
+    try:
+        for start in range(0, len(X) - time_steps, chunk_size):
+            end = min(start + chunk_size, len(X) - time_steps)
+            chunk_X = X.iloc[start:end + time_steps]
+            chunk_y = y.iloc[start:end + time_steps]
+            for i in range(len(chunk_X) - time_steps):
+                Xs.append(chunk_X.iloc[i:(i + time_steps)].values)
+                ys.append(chunk_y.iloc[i + time_steps])
+            print(f"Processed chunk {start} to {end}")
+            print(f"Memory usage: {psutil.virtual_memory().percent}%")
+    except MemoryError:
+        print("Memory error occurred. Try reducing chunk_size or time_steps.")
+        raise
     return np.array(Xs), np.array(ys)
 
 time_steps = 50
-X_seq, y_seq = create_sequences(X, y, time_steps)
+chunk_size = 10000  # Adjust based on your system's memory capacity
 
+try:
+    print("Creating training sequences...")
+    X_seq, y_seq = create_sequences_chunked(X, y, time_steps, chunk_size)
+except MemoryError:
+    print("Failed to create sequences. Consider reducing chunk_size or time_steps.")
+    exit(1)
 
 X_train, X_test, y_train, y_test = train_test_split(X_seq, y_seq, test_size=0.2, shuffle=False)
 
@@ -93,7 +103,6 @@ X_test_2d = X_test.reshape(-1, X_test.shape[2])
 
 X_train_scaled = scaler.fit_transform(X_train_2d).reshape(X_train.shape)
 X_test_scaled = scaler.transform(X_test_2d).reshape(X_test.shape)
-
 
 model = Sequential()
 model.add(LSTM(units=64, return_sequences=True, input_shape=(time_steps, len(features))))
@@ -105,10 +114,8 @@ model.add(Dense(units=1, activation='sigmoid'))
 model.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=['accuracy'])
 model.summary()
 
-
 history = model.fit(X_train_scaled, y_train, epochs=3, batch_size=32,
                     validation_data=(X_test_scaled, y_test), verbose=1)
-
 
 loss, accuracy = model.evaluate(X_test_scaled, y_test)
 print(f"Test Accuracy: {accuracy * 100:.2f}%")
@@ -147,8 +154,14 @@ if len(voltage_cols_new) > 1:
             new_features.extend([ratio_col, diff_col])
 
 new_X = new_data[new_features]
-new_X_seq, _ = create_sequences(new_X, pd.Series([0]*len(new_X)), time_steps)
-new_X_scaled = scaler.transform(new_X_seq.reshape(-1, new_X_seq.shape[2])).reshape(new_X_seq.shape)
+try:
+    print("Creating sequences for new data...")
+    new_X_seq, _ = create_sequences_chunked(new_X, pd.Series([0]*len(new_X)), 
+                                          time_steps, chunk_size)
+    new_X_scaled = scaler.transform(new_X_seq.reshape(-1, new_X_seq.shape[2])).reshape(new_X_seq.shape)
+except MemoryError:
+    print("Failed to create sequences for new data. Consider reducing chunk_size or time_steps.")
+    exit(1)
 
 predictions = model.predict(new_X_scaled)
 threshold = 0.5
@@ -158,23 +171,17 @@ for i, pred in enumerate(predictions):
     else:
         print(f"Time step {i + time_steps}: Gauge looks good. (Probability: {pred[0]:.2f})")
 
-
 model.save('C:/Users/Busiso/Desktop/strain_gauge_lstm_model.keras')
 print("Model saved as 'strain_gauge_lstm_model.keras'")
-
 
 joblib.dump(scaler, 'scaler.pkl')
 print("Scaler saved as 'scaler.pkl'")
 
-
-
 loaded_model = load_model('C:/Users/Busiso/Desktop/strain_gauge_lstm_model.keras')
 loaded_scaler = joblib.load('C:/Users/Busiso/Desktop/scaler.pkl')
 
-
 X_test_small = X_test_scaled[:10]
 y_test_small = y_test[:10]
-
 
 loaded_predictions = loaded_model.predict(X_test_small)
 print("\nVerification of loaded model:")
@@ -182,7 +189,6 @@ for i, (pred, true) in enumerate(zip(loaded_predictions, y_test_small)):
     pred_value = pred[0]
     pred_label = 1 if pred_value > threshold else 0
     print(f"Sample {i}: Predicted={pred_label} (Prob: {pred_value:.2f}), True={true}")
-
 
 original_predictions = model.predict(X_test_small)
 print("\nComparison with original model:")
