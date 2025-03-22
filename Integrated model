@@ -1,0 +1,40 @@
+import pandas as pd
+import numpy as np
+from tensorflow.keras.models import load_model
+from sklearn.neural_network import MLPRegressor
+import joblib
+
+# Load strain gauge model and scaler
+strain_model = load_model('trained_strain_gauge_model.h5')
+strain_scaler = joblib.load('scaler.pkl')
+
+# Load SHPB model and scalers
+shpb_model = joblib.load('shpb_digital_twin_model.pkl')
+shpb_scaler_X = joblib.load('scaler_X.pkl')
+shpb_scaler_y = joblib.load('scaler_y.pkl')
+
+# Load new data (Excel)
+data = pd.read_excel('new_data.xlsx')
+time_cols, voltage_cols = identify_columns(data)  # From strain gauge script
+
+# Strain gauge processing
+features = generate_strain_features(data, voltage_cols)  # Your feature generation
+sequences = create_sequences_chunked(data[features], time_steps=50)
+scaled_sequences = strain_scaler.transform(sequences.reshape(-1, sequences.shape[2])).reshape(sequences.shape)
+predictions = strain_model.predict(scaled_sequences)
+reliable_indices = [i + 50 for i, pred in enumerate(predictions) if pred[0] <= 0.5]
+strain = data[voltage_cols[0]].values / (2.0 * 5.0)  # Gauge factor * excitation voltage
+reliable_strain = strain[reliable_indices]
+
+# SHPB processing with reliable strain
+shpb_inputs = pd.DataFrame({
+    'E_bar': [E_bar] * len(reliable_strain),  # From user input
+    'A_bar': [A_bar] * len(reliable_strain),
+    # ... other SHPB inputs ...
+    'eps_t': reliable_strain  # Use reliable strain as transmitted strain
+})
+shpb_X_scaled = shpb_scaler_X.transform(shpb_inputs)
+shpb_predictions = shpb_model.predict(shpb_X_scaled)
+shpb_outputs = shpb_scaler_y.inverse_transform(shpb_predictions)
+
+print(f"Predicted stress: {shpb_outputs[:, 0]}")
