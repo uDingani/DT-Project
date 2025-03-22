@@ -26,31 +26,27 @@ static_strength = get_float_input("Static strength of material (Pa): ")
 L_bar = get_float_input("Length of bar (m): ")
 k = get_float_input("Calibration factor (strain/V): ")
 
-
-csv_path = input("Enter the path to your CSV file: ")
+excel_path = input("Enter the path to your Excel file: ")
 try:
-    data = pd.read_csv(csv_path)
+    data = pd.read_excel(excel_path)
     
     required_columns = ["Time (s) - PXI1Slot4/ai0", "Voltage (V) - PXI1Slot4/ai0",
                         "Time (s) - PXI1Slot4/ai1", "Voltage (V) - PXI1Slot4/ai1"]
     if not all(col in data.columns for col in required_columns):
-        raise ValueError("CSV file must contain the required columns: " + ", ".join(required_columns))
+        raise ValueError("Excel file must contain the required columns: " + ", ".join(required_columns))
 except FileNotFoundError:
-    print(f"Error: File '{csv_path}' not found.")
+    print(f"Error: File '{excel_path}' not found.")
     exit()
 except ValueError as e:
     print(f"Error: {e}")
     exit()
 
-
 voltage_inc_bar = data["Voltage (V) - PXI1Slot4/ai0"].values
 voltage_trans_bar = data["Voltage (V) - PXI1Slot4/ai1"].values
 time = data["Time (s) - PXI1Slot4/ai0"].values
 
-
 strain_inc_bar = voltage_inc_bar * k  
 strain_trans_bar = voltage_trans_bar * k  
-
 
 t_separation = L_bar / c0 
 mask_incident = time <= t_separation
@@ -60,7 +56,6 @@ eps_i = strain_inc_bar * mask_incident
 eps_r = strain_inc_bar * mask_reflected  
 eps_t = strain_trans_bar  
 
-
 dt = time[1] - time[0] 
 strain_rate = -2 * c0 * eps_r / L_specimen
 strain = np.cumsum(strain_rate) * dt
@@ -68,7 +63,6 @@ stress = E_bar * A_bar * eps_t / A_specimen
 avg_strain_rate = np.mean(strain_rate[strain_rate > 0]) if np.any(strain_rate > 0) else 0
 dynamic_strength = np.max(stress)
 DIF = dynamic_strength / static_strength
-
 
 inputs = np.array([E_bar, A_bar, A_specimen, L_specimen, c0, static_strength]).reshape(1, -1)
 X = np.column_stack((inputs.repeat(len(time), axis=0), eps_i, eps_r, eps_t))
@@ -81,7 +75,6 @@ y_scaled = scaler_y.fit_transform(y)
 
 model = MLPRegressor(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
 model.fit(X_scaled, y_scaled)
-
 
 y_pred_scaled = model.predict(X_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
@@ -105,7 +98,6 @@ results_df = pd.DataFrame({
 results_df.to_csv("shpb_results.csv", index=False)
 print("\nResults saved to 'shpb_results.csv'")
 
-
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(strain, stress / 1e6, label="Experimental")
@@ -128,7 +120,6 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
-
 
 joblib.dump(model, "shpb_digital_twin_model.pkl")
 joblib.dump(scaler_X, "scaler_X.pkl")
