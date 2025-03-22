@@ -37,23 +37,6 @@ data_acquisition:
     - name: "transmission_bar"
       device: "PXI1Slot4/ai1"
 
-# Database
-database:
-  type: "sqlite"
-  path: "digital_twin.db"
-  tables:
-    - name: "experiments"
-      columns:
-        - "timestamp"
-        - "parameters"
-        - "results"
-    - name: "predictions"
-      columns:
-        - "timestamp"
-        - "model"
-        - "predictions"
-        - "actual_values"
-
 # UI Settings
 ui:
   theme: "light"
