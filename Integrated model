@@ -3,6 +3,73 @@ import numpy as np
 from tensorflow.keras.models import load_model
 import joblib
 import os
+from sklearn.base import BaseEstimator
+from sklearn.ensemble import RandomForestRegressor
+
+class HybridModel(BaseEstimator):
+    def __init__(self, strain_model, shpb_model, strain_scaler, shpb_scaler_X, shpb_scaler_y):
+        self.strain_model = strain_model
+        self.shpb_model = shpb_model
+        self.strain_scaler = strain_scaler
+        self.shpb_scaler_X = shpb_scaler_X
+        self.shpb_scaler_y = shpb_scaler_y
+        self.reliability_threshold = 0.5
+        self.max_iterations = 3
+        self.convergence_threshold = 1e-6
+        
+    def predict_strain_reliability(self, sequences):
+        scaled_sequences = self.strain_scaler.transform(sequences.reshape(-1, sequences.shape[2])).reshape(sequences.shape)
+        return self.strain_model.predict(scaled_sequences)
+    
+    def predict_shpb(self, inputs):
+        scaled_inputs = self.shpb_scaler_X.transform(inputs)
+        predictions = self.shpb_model.predict(scaled_inputs)
+        return self.shpb_scaler_y.inverse_transform(predictions)
+    
+    def refine_predictions(self, strain_data, shpb_params, initial_stress):
+        current_stress = initial_stress
+        iteration = 0
+        
+        while iteration < self.max_iterations:
+            # Use stress predictions to refine strain reliability
+            stress_factor = np.clip(current_stress / shpb_params['static_strength'], 0, 1)
+            reliability_adjustment = 1 - stress_factor
+            
+            # Update strain reliability predictions
+            sequences = create_sequences_chunked(strain_data, time_steps=50, stride=1)
+            base_reliability = self.predict_strain_reliability(sequences)
+            adjusted_reliability = base_reliability * reliability_adjustment
+            
+            # Filter reliable strains
+            reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= self.reliability_threshold]
+            reliable_strain = strain_data[reliable_indices]
+            
+            if not reliable_strain.size:
+                break
+                
+            # Update SHPB inputs with refined strain data
+            shpb_inputs = pd.DataFrame({
+                'E_bar': [shpb_params['E_bar']] * len(reliable_strain),
+                'A_bar': [shpb_params['A_bar']] * len(reliable_strain),
+                'A_specimen': [shpb_params['A_specimen']] * len(reliable_strain),
+                'L_specimen': [shpb_params['L_specimen']] * len(reliable_strain),
+                'c0': [shpb_params['c0']] * len(reliable_strain),
+                'static_strength': [shpb_params['static_strength']] * len(reliable_strain),
+                'L_bar': [shpb_params['L_bar']] * len(reliable_strain),
+                'eps_t': reliable_strain
+            })
+            
+            # Get new stress predictions
+            new_stress = self.predict_shpb(shpb_inputs)
+            
+            # Check convergence
+            if np.abs(np.mean(new_stress) - np.mean(current_stress)) < self.convergence_threshold:
+                break
+                
+            current_stress = new_stress
+            iteration += 1
+            
+        return current_stress, reliable_strain
 
 # Function to get float input with validation
 def get_float_input(prompt):
@@ -44,52 +111,59 @@ shpb_model = joblib.load('shpb_digital_twin_model.pkl')
 shpb_scaler_X = joblib.load('scaler_X.pkl')
 shpb_scaler_y = joblib.load('scaler_y.pkl')
 
+# Initialize hybrid model
+hybrid_model = HybridModel(strain_model, shpb_model, strain_scaler, shpb_scaler_X, shpb_scaler_y)
+
 # Collect user inputs for SHPB setup with basic validation
 print("Enter the following parameters for the SHPB setup:")
-E_bar = get_float_input("Young's modulus of bar (Pa): ")
-A_bar = get_float_input("Cross-sectional area of bar (m^2): ")
-A_specimen = get_float_input("Cross-sectional area of specimen (m^2): ")
-L_specimen = get_float_input("Length of specimen (m): ")
-c0 = get_float_input("Wave speed in bar (m/s): ")
-static_strength = get_float_input("Static strength of material (Pa): ")
-L_bar = get_float_input("Length of bar (m): ")
-k = get_float_input("Calibration factor (strain/V): ")
+shpb_params = {
+    'E_bar': get_float_input("Young's modulus of bar (Pa): "),
+    'A_bar': get_float_input("Cross-sectional area of bar (m^2): "),
+    'A_specimen': get_float_input("Cross-sectional area of specimen (m^2): "),
+    'L_specimen': get_float_input("Length of specimen (m): "),
+    'c0': get_float_input("Wave speed in bar (m/s): "),
+    'static_strength': get_float_input("Static strength of material (Pa): "),
+    'L_bar': get_float_input("Length of bar (m): "),
+    'k': get_float_input("Calibration factor (strain/V): ")
+}
 
 # Basic physical consistency check
-if c0 > 20000:  # Rough upper limit for wave speed in solids
+if shpb_params['c0'] > 20000:  # Rough upper limit for wave speed in solids
     print("Warning: Wave speed seems unusually high. Please verify.")
 
 # Load and process strain gauge data
 data = pd.read_excel('new_data.xlsx')
 time_cols, voltage_cols = identify_columns(data)
 features = generate_strain_features(data, voltage_cols)
-sequences = create_sequences_chunked(data[features], time_steps=50, stride=1)
-scaled_sequences = strain_scaler.transform(sequences.reshape(-1, sequences.shape[2])).reshape(sequences.shape)
-predictions = strain_model.predict(scaled_sequences)
-reliable_indices = [i + 50 for i, pred in enumerate(predictions) if pred[0] <= 0.5]
-strain = data[voltage_cols[0]].values * k  # Use user-provided calibration factor
-reliable_strain = strain[reliable_indices]
+strain_data = data[voltage_cols[0]].values * shpb_params['k']  # Convert voltage to strain
 
-if not reliable_strain.size:
-    raise ValueError("No reliable strain data found. Check model predictions or data quality.")
-
-# SHPB processing with user inputs
-shpb_inputs = pd.DataFrame({
-    'E_bar': [E_bar] * len(reliable_strain),
-    'A_bar': [A_bar] * len(reliable_strain),
-    'A_specimen': [A_specimen] * len(reliable_strain),
-    'L_specimen': [L_specimen] * len(reliable_strain),
-    'c0': [c0] * len(reliable_strain),
-    'static_strength': [static_strength] * len(reliable_strain),
-    'L_bar': [L_bar] * len(reliable_strain),
-    'eps_t': reliable_strain  # Transmitted strain
+# Initial SHPB prediction
+initial_shpb_inputs = pd.DataFrame({
+    'E_bar': [shpb_params['E_bar']] * len(strain_data),
+    'A_bar': [shpb_params['A_bar']] * len(strain_data),
+    'A_specimen': [shpb_params['A_specimen']] * len(strain_data),
+    'L_specimen': [shpb_params['L_specimen']] * len(strain_data),
+    'c0': [shpb_params['c0']] * len(strain_data),
+    'static_strength': [shpb_params['static_strength']] * len(strain_data),
+    'L_bar': [shpb_params['L_bar']] * len(strain_data),
+    'eps_t': strain_data
 })
-shpb_X_scaled = shpb_scaler_X.transform(shpb_inputs)
-shpb_predictions = shpb_model.predict(shpb_X_scaled)
-shpb_outputs = shpb_scaler_y.inverse_transform(shpb_predictions)
+initial_stress = hybrid_model.predict_shpb(initial_shpb_inputs)
+
+# Refine predictions using hybrid model
+final_stress, reliable_strain = hybrid_model.refine_predictions(strain_data, shpb_params, initial_stress)
 
 # Output results with better formatting
+print("\nFinal Results:")
+print(f"Number of reliable strain measurements: {len(reliable_strain)}")
 print("\nPredicted stress (Pa):")
-for i, stress in enumerate(shpb_outputs[:, 0]):
+for i, stress in enumerate(final_stress[:, 0]):
     print(f"Sample {i+1}: {stress:.2e} Pa")
+
+# Calculate and display statistics
+mean_stress = np.mean(final_stress[:, 0])
+std_stress = np.std(final_stress[:, 0])
+print(f"\nStatistics:")
+print(f"Mean stress: {mean_stress:.2e} Pa")
+print(f"Standard deviation: {std_stress:.2e} Pa")
     
