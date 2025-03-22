@@ -1,40 +1,95 @@
 import pandas as pd
 import numpy as np
 from tensorflow.keras.models import load_model
-from sklearn.neural_network import MLPRegressor
 import joblib
+import os
 
-# Load strain gauge model and scaler
+# Function to get float input with validation
+def get_float_input(prompt):
+    while True:
+        try:
+            value = float(input(prompt))
+            if value <= 0:
+                print("Value must be positive. Please try again.")
+                continue
+            return value
+        except ValueError:
+            print("Invalid input. Please enter a numeric value (e.g., 200e9 for 200 GPa).")
+
+# Placeholder functions (replace with your actual implementations)
+def identify_columns(data): return ['Time'], ['Voltage']
+def generate_strain_features(data, cols): return cols
+
+# Updated sequence creation with stride option
+def create_sequences_chunked(data, time_steps, stride=1):
+    return np.array([data[i:i+time_steps] for i in range(0, len(data)-time_steps, stride)])
+
+# Check if required files exist
+required_files = {
+    'new_data.xlsx': 'Input data file',
+    'trained_strain_gauge_model.h5': 'Strain gauge model',
+    'scaler.pkl': 'Strain scaler',
+    'shpb_digital_twin_model.pkl': 'SHPB model',
+    'scaler_X.pkl': 'SHPB input scaler',
+    'scaler_y.pkl': 'SHPB output scaler'
+}
+for file, desc in required_files.items():
+    if not os.path.exists(file):
+        raise FileNotFoundError(f"{desc} not found: {file}")
+
+# Load models and scalers
 strain_model = load_model('trained_strain_gauge_model.h5')
 strain_scaler = joblib.load('scaler.pkl')
-
-# Load SHPB model and scalers
 shpb_model = joblib.load('shpb_digital_twin_model.pkl')
 shpb_scaler_X = joblib.load('scaler_X.pkl')
 shpb_scaler_y = joblib.load('scaler_y.pkl')
 
-# Load new data (Excel)
-data = pd.read_excel('new_data.xlsx')
-time_cols, voltage_cols = identify_columns(data)  # From strain gauge script
+# Collect user inputs for SHPB setup with basic validation
+print("Enter the following parameters for the SHPB setup:")
+E_bar = get_float_input("Young's modulus of bar (Pa): ")
+A_bar = get_float_input("Cross-sectional area of bar (m^2): ")
+A_specimen = get_float_input("Cross-sectional area of specimen (m^2): ")
+L_specimen = get_float_input("Length of specimen (m): ")
+c0 = get_float_input("Wave speed in bar (m/s): ")
+static_strength = get_float_input("Static strength of material (Pa): ")
+L_bar = get_float_input("Length of bar (m): ")
+k = get_float_input("Calibration factor (strain/V): ")
 
-# Strain gauge processing
-features = generate_strain_features(data, voltage_cols)  # Your feature generation
-sequences = create_sequences_chunked(data[features], time_steps=50)
+# Basic physical consistency check
+if c0 > 20000:  # Rough upper limit for wave speed in solids
+    print("Warning: Wave speed seems unusually high. Please verify.")
+
+# Load and process strain gauge data
+data = pd.read_excel('new_data.xlsx')
+time_cols, voltage_cols = identify_columns(data)
+features = generate_strain_features(data, voltage_cols)
+sequences = create_sequences_chunked(data[features], time_steps=50, stride=1)
 scaled_sequences = strain_scaler.transform(sequences.reshape(-1, sequences.shape[2])).reshape(sequences.shape)
 predictions = strain_model.predict(scaled_sequences)
 reliable_indices = [i + 50 for i, pred in enumerate(predictions) if pred[0] <= 0.5]
-strain = data[voltage_cols[0]].values / (2.0 * 5.0)  # Gauge factor * excitation voltage
+strain = data[voltage_cols[0]].values * k  # Use user-provided calibration factor
 reliable_strain = strain[reliable_indices]
 
-# SHPB processing with reliable strain
+if not reliable_strain.size:
+    raise ValueError("No reliable strain data found. Check model predictions or data quality.")
+
+# SHPB processing with user inputs
 shpb_inputs = pd.DataFrame({
-    'E_bar': [E_bar] * len(reliable_strain),  # From user input
+    'E_bar': [E_bar] * len(reliable_strain),
     'A_bar': [A_bar] * len(reliable_strain),
-    # ... other SHPB inputs ...
-    'eps_t': reliable_strain  # Use reliable strain as transmitted strain
+    'A_specimen': [A_specimen] * len(reliable_strain),
+    'L_specimen': [L_specimen] * len(reliable_strain),
+    'c0': [c0] * len(reliable_strain),
+    'static_strength': [static_strength] * len(reliable_strain),
+    'L_bar': [L_bar] * len(reliable_strain),
+    'eps_t': reliable_strain  # Transmitted strain
 })
 shpb_X_scaled = shpb_scaler_X.transform(shpb_inputs)
 shpb_predictions = shpb_model.predict(shpb_X_scaled)
 shpb_outputs = shpb_scaler_y.inverse_transform(shpb_predictions)
 
-print(f"Predicted stress: {shpb_outputs[:, 0]}")
+# Output results with better formatting
+print("\nPredicted stress (Pa):")
+for i, stress in enumerate(shpb_outputs[:, 0]):
+    print(f"Sample {i+1}: {stress:.2e} Pa")
+    
