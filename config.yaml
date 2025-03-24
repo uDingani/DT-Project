@@ -1,0 +1,67 @@
+# Digital Twin Configuration
+
+# File Paths
+paths:
+  data_dir: "data"
+  results_dir: "results"
+  models_dir: "models"
+  logs_dir: "logs"
+
+# Model Parameters
+models:
+  strain_gauge:
+    path: "models/strain_gauge_lstm_model.keras"
+    scaler_path: "models/scaler.pkl"
+    sequence_length: 50
+    threshold: 0.5
+  shpb:
+    path: "models/shpb_digital_twin_model.pkl"
+    scaler_X_path: "models/scaler_X.pkl"
+    scaler_y_path: "models/scaler_y.pkl"
+    parameters:
+      E_bar: 200e9  # Pa
+      A_bar: 0.0001  # m^2
+      A_specimen: 0.0001  # m^2
+      L_specimen: 0.02  # m
+      c0: 5000  # m/s
+      L_bar: 1.0  # m
+      k: 2.0  # strain/V
+
+# Data Acquisition
+data_acquisition:
+  sampling_rate: 100000  # Hz
+  buffer_size: 10000
+  channels:
+    - name: "incident_bar"
+      device: "PXI1Slot4/ai0"
+    - name: "transmission_bar"
+      device: "PXI1Slot4/ai1"
+
+# UI Settings
+ui:
+  theme: "light"
+  refresh_rate: 1  # seconds
+  plots:
+    - type: "strain_vs_time"
+      title: "Strain vs Time"
+    - type: "stress_strain"
+      title: "Stress-Strain Curve"
+    - type: "gauge_reliability"
+      title: "Gauge Reliability"
+
+# Alert Settings
+alerts:
+  email:
+    enabled: false
+    recipients: []
+  logging:
+    enabled: true
+    level: "INFO"
+  thresholds:
+    strain_gauge_reliability: 0.5
+    stress_deviation: 0.1  # 10% deviation from expected
+
+gui:
+  update_interval: 100  # ms
+  plot_buffer_size: 1000
+  window_size: [1200, 800] 
