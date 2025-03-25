@@ -26,6 +26,7 @@ models:
       c0: 5000  # m/s
       L_bar: 1.0  # m
       k: 2.0  # strain/V
+      static_strength: 50e6  # Pa (50 MPa)
 
 # Data Acquisition
 data_acquisition:
