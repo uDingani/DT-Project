@@ -32,9 +32,15 @@ class HybridModel(BaseEstimator):
         return self.strain_model.predict(scaled_sequences)
     
     def predict_shpb(self, inputs):
-        # Print feature names and input columns for debugging
-        print("\nExpected features:", self.shpb_scaler_X.feature_names_in_)
-        print("Input columns:", inputs.columns.tolist())
+        # Print input columns for debugging
+        print("\nInput columns:", inputs.columns.tolist())
+        
+        # Load feature names from file if available
+        try:
+            feature_names = joblib.load('models/feature_names.pkl')
+            print("Expected features:", feature_names)
+        except:
+            print("Warning: Could not load feature names from models/feature_names.pkl")
         
         scaled_inputs = self.shpb_scaler_X.transform(inputs)
         predictions = self.shpb_model.predict(scaled_inputs)
