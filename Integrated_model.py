@@ -422,6 +422,10 @@ def main():
         }
     )
     
+    if isinstance(experiment_id, str) and ('/' in experiment_id or '\\' in experiment_id):
+        # Extract just the filename without extension
+        experiment_id = os.path.splitext(os.path.basename(experiment_id))[0]
+    
     # Save predictions
     predictions_df = pd.DataFrame({
         'Time': data[time_cols[0]].values[reliable_indices],
@@ -448,6 +452,8 @@ def main():
     
     # Save the plot
     plot_path = os.path.join('results', f'stress_strain_curve_{experiment_id}.png')
+    os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+    print(f"Saving plot to: {plot_path}")
     plt.savefig(plot_path)
     plt.close()
     
