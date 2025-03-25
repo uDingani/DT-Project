@@ -329,8 +329,17 @@ def main():
     # Get reliable indices from the last iteration
     sequences = create_sequences_chunked(strain_data, time_steps=50, stride=1)
     base_reliability = hybrid_model.predict_strain_reliability(sequences)
+    
     final_stress_array = np.asarray(final_stress, dtype=np.float64)
     static_strength = float(shpb_params['static_strength'])
+    
+    if len(final_stress_array) < len(base_reliability):
+        padding_length = len(base_reliability) - len(final_stress_array)
+        final_stress_padded = np.concatenate([final_stress_array, 
+        np.repeat(final_stress_array[-1], padding_length)])
+    else:
+        final_stress_padded = final_stress_array[:len(base_reliability)]
+        
     stress_factor = np.clip(final_stress_array / static_strength, 0, 1)
     reliability_adjustment = 1 - stress_factor
     adjusted_reliability = base_reliability * reliability_adjustment
