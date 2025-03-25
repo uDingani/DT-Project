@@ -56,7 +56,7 @@ class HybridModel(BaseEstimator):
         })
         
         # Fill NaN values
-        strain_df = strain_df.fillna(method='ffill').fillna(method='bfill')
+        strain_df = strain_df.ffill().bfill()
         
         # Scale the features
         scaled_features = self.strain_scaler.transform(strain_df)
@@ -68,6 +68,10 @@ class HybridModel(BaseEstimator):
         return self.strain_model.predict(scaled_sequences)
     
     def predict_shpb(self, inputs):
+         if 'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1' not in inputs.columns:
+        # Calculate the difference between the two voltage columns
+        inputs['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = (
+            inputs['Voltage (V) - PXI1Slot4/ai0'] - inputs['Voltage (V) - PXI1Slot4/ai1']
         # Print input columns for debugging
         print("\nInput columns:", inputs.columns.tolist())
         print("Number of input features:", len(inputs.columns))
@@ -250,6 +254,7 @@ def process_voltage_data(data, voltage_cols):
     
     return data
 
+
 def main():
     # Create results directory if it doesn't exist
     if not os.path.exists('results'):
@@ -299,18 +304,20 @@ def main():
     processed_data = process_voltage_data(data, voltage_cols)
     
     # Create input features for SHPB model
-    shpb_inputs = pd.DataFrame({
-        'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
-        'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
-        'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': processed_data[f'{voltage_cols[0]}_Rolling_Mean'],
-        'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': processed_data[f'{voltage_cols[0]}_Rolling_Std'],
-        'Voltage (V) - PXI1Slot4/ai1': processed_data[voltage_cols[1]],
-        'Voltage (V) - PXI1Slot4/ai1_Diff': processed_data[f'{voltage_cols[1]}_Diff'],
-        'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
-        'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
-        'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
-    })
-    
+  # Create input features for SHPB model
+shpb_inputs = pd.DataFrame({
+    'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
+    'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
+    'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': processed_data[f'{voltage_cols[0]}_Rolling_Mean'],
+    'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': processed_data[f'{voltage_cols[0]}_Rolling_Std'],
+    'Voltage (V) - PXI1Slot4/ai1': processed_data[voltage_cols[1]],
+    'Voltage (V) - PXI1Slot4/ai1_Diff': processed_data[f'{voltage_cols[1]}_Diff'],
+    'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
+    'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
+    'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'],
+    'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
+})
+
     # Get initial stress predictions
     initial_stress = hybrid_model.predict_shpb(shpb_inputs)
     
@@ -319,11 +326,13 @@ def main():
     
     # Refine predictions using hybrid model
     final_stress, reliable_strain = hybrid_model.refine_predictions(strain_data, shpb_params, initial_stress)
-    
+
     # Get reliable indices from the last iteration
     sequences = create_sequences_chunked(strain_data, time_steps=50, stride=1)
     base_reliability = hybrid_model.predict_strain_reliability(sequences)
-    stress_factor = np.clip(final_stress / shpb_params['static_strength'], 0, 1)
+    final_stress_array = np.asarray(final_stress, dtype=np.float64)
+    static_strength = float(shpb_params['static_strength'])
+    stress_factor = np.clip(final_stress_array / static_strength, 0, 1)
     reliability_adjustment = 1 - stress_factor
     adjusted_reliability = base_reliability * reliability_adjustment
     reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= hybrid_model.reliability_threshold]
