@@ -109,7 +109,20 @@ class HybridModel(BaseEstimator):
             # Update strain reliability predictions
             sequences = create_sequences_chunked(strain_data, time_steps=50, stride=1)
             base_reliability = self.predict_strain_reliability(sequences)
-            adjusted_reliability = base_reliability * reliability_adjustment.reshape(-1, 1)
+            
+            # Ensure shapes match for multiplication
+            if len(reliability_adjustment.shape) == 1:
+                reliability_adjustment = reliability_adjustment.reshape(-1, 1)
+            if len(base_reliability.shape) == 1:
+                base_reliability = base_reliability.reshape(-1, 1)
+                
+            # Trim reliability_adjustment to match base_reliability shape if needed
+            if reliability_adjustment.shape[0] > base_reliability.shape[0]:
+                reliability_adjustment = reliability_adjustment[:base_reliability.shape[0]]
+            elif reliability_adjustment.shape[0] < base_reliability.shape[0]:
+                base_reliability = base_reliability[:reliability_adjustment.shape[0]]
+                
+            adjusted_reliability = base_reliability * reliability_adjustment
             
             # Filter reliable strains
             reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= self.reliability_threshold]
@@ -132,7 +145,7 @@ class HybridModel(BaseEstimator):
             })
             
             # Fill NaN values
-            shpb_inputs = shpb_inputs.fillna(method='ffill').fillna(method='bfill')
+            shpb_inputs = shpb_inputs.ffill().bfill()
             
             # Get new stress predictions
             new_stress = self.predict_shpb(shpb_inputs)
