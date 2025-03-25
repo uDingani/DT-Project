@@ -331,8 +331,16 @@ def main():
         'Reliable_Strain': np.nan,
         'Stress': np.nan
     })
-    results_df.loc[reliable_indices, 'Reliable_Strain'] = reliable_strain
-    results_df.loc[reliable_indices, 'Stress'] = final_stress
+    
+    # Ensure reliable_indices and final_stress have matching lengths
+    if len(reliable_indices) > len(final_stress):
+        reliable_indices = reliable_indices[:len(final_stress)]
+    elif len(reliable_indices) < len(final_stress):
+        final_stress = final_stress[:len(reliable_indices)]
+    
+    # Assign values to the DataFrame
+    results_df.loc[reliable_indices, 'Reliable_Strain'] = reliable_strain[:len(reliable_indices)]
+    results_df.loc[reliable_indices, 'Stress'] = final_stress[:len(reliable_indices)]
     
     # Save experiment data
     experiment_id = db.save_experiment(
@@ -349,8 +357,8 @@ def main():
     # Save predictions
     predictions_df = pd.DataFrame({
         'Time': data[time_cols[0]].values[reliable_indices],
-        'Strain': reliable_strain,
-        'Stress': final_stress
+        'Strain': reliable_strain[:len(reliable_indices)],
+        'Stress': final_stress[:len(reliable_indices)]
     })
     
     db.save_predictions(
