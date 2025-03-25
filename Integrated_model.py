@@ -32,6 +32,10 @@ class HybridModel(BaseEstimator):
         return self.strain_model.predict(scaled_sequences)
     
     def predict_shpb(self, inputs):
+        # Print feature names and input columns for debugging
+        print("\nExpected features:", self.shpb_scaler_X.feature_names_in_)
+        print("Input columns:", inputs.columns.tolist())
+        
         scaled_inputs = self.shpb_scaler_X.transform(inputs)
         predictions = self.shpb_model.predict(scaled_inputs)
         return self.shpb_scaler_y.inverse_transform(predictions)
