@@ -17,9 +17,74 @@ from Integrated_model import HybridModel
 import os
 from datetime import datetime
 class DigitalTwinGUI:
-    def __init__(self, config_path='config.yaml'):
+    def __init__(self, config_path=None):
+        if config_path is None:
+            # Try to find the config file in various locations
+            possible_paths = [
+                'config.yaml',                      # Current directory
+                '../config.yaml',                   # Parent directory
+                os.path.join(os.path.dirname(__file__), 'config.yaml'),  # Same directory as script
+                os.path.join(os.path.dirname(__file__), '../config.yaml')  # Parent of script directory
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                config_path = path
+                break
+        
+        if config_path is None:
+            # If config file not found, create a default one
+            config_path = 'config.yaml'
+            default_config = {
+                'data_acquisition': {
+                    'sampling_rate': 1000,
+                    'buffer_size': 10000,
+                    'channels': [
+                        {'name': 'PXI1Slot4/ai0', 'description': 'Incident Bar Strain Gauge', 'calibration_factor': 1.0},
+                        {'name': 'PXI1Slot4/ai1', 'description': 'Transmission Bar Strain Gauge', 'calibration_factor': 1.0}
+                    ]
+                },
+                'database': {
+                    'type': 'file',
+                    'path': 'data/experiments'
+                },
+                'models': {
+                    'shpb': {
+                        'parameters': {
+                            'E_bar': 200e9,
+                            'A_bar': 0.0005,
+                            'A_specimen': 0.0001,
+                            'L_specimen': 0.01,
+                            'c0': 5000,
+                            'static_strength': 500e6,
+                            'L_bar': 2.0,
+                            'k': 2.11
+                        }
+                    }
+                },
+                'paths': {
+                    'data_dir': 'data',
+                    'models_dir': 'models',
+                    'logs_dir': 'logs',
+                    'results_dir': 'results'
+                }
+            }
+            
+            # Create directories if they don't exist
+            for dir_path in ['data', 'models', 'logs', 'results']:
+                os.makedirs(dir_path, exist_ok=True)
+            
+            # Write default config
+            with open(config_path, 'w') as f:
+                yaml.dump(default_config, f, default_flow_style=False)
+            
+            print(f"Created default config file at {config_path}")
+    
+   
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
+    
+   
         
         # Initialize components
         self.data_acquisition = DataAcquisition(config_path)
