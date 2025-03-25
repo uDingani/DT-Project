@@ -103,9 +103,19 @@ class HybridModel(BaseEstimator):
         current_stress = np.array(initial_stress).flatten()
         iteration = 0
         
+        # Convert current_stress to numpy array and handle dimensions
+        current_stress = np.array(current_stress)
+        if len(current_stress.shape) == 2:
+            current_stress = current_stress[:, 0]
+        elif len(current_stress.shape) == 3:
+            current_stress = current_stress[:, 0, 0]
+        
+        # Convert static_strength to float and ensure it's a scalar
+        static_strength = float(shpb_params['static_strength'])
+        
         while iteration < self.max_iterations:
             # Use stress predictions to refine strain reliability
-            stress_factor = np.clip(current_stress / float(shpb_params['static_strength']), 0, 1)
+            stress_factor = np.clip(current_stress / static_strength, 0, 1)
             reliability_adjustment = 1 - stress_factor
             
             # Update strain reliability predictions
@@ -151,7 +161,13 @@ class HybridModel(BaseEstimator):
             
             # Get new stress predictions
             new_stress = self.predict_shpb(shpb_inputs)
-            new_stress = np.array(new_stress).flatten()
+            
+            # Convert new_stress to numpy array and handle dimensions
+            new_stress = np.array(new_stress)
+            if len(new_stress.shape) == 2:
+                new_stress = new_stress[:, 0]
+            elif len(new_stress.shape) == 3:
+                new_stress = new_stress[:, 0, 0]
             
             # Check convergence
             if np.abs(np.mean(new_stress) - np.mean(current_stress)) < self.convergence_threshold:
