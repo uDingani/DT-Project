@@ -160,7 +160,7 @@ def process_voltage_data(data, voltage_cols):
     data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = data[incident_col] - data[transmission_col]
     
     # Fill NaN values with forward fill then backward fill
-    data = data.fillna(method='ffill').fillna(method='bfill')
+    data = data.ffill().bfill()
     
     return data
 
@@ -218,8 +218,7 @@ def main():
         'Voltage (V) - PXI1Slot4/ai1_Diff': processed_data[f'{voltage_cols[1]}_Diff'],
         'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
         'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
-        'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'],
-        'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
+        'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
     })
     
     # Get initial stress predictions
