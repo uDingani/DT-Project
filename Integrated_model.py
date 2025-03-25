@@ -34,13 +34,24 @@ class HybridModel(BaseEstimator):
     def predict_shpb(self, inputs):
         # Print input columns for debugging
         print("\nInput columns:", inputs.columns.tolist())
+        print("Number of input features:", len(inputs.columns))
+        
+        # Print scaler information
+        print("\nScaler information:")
+        print("Number of features expected by scaler:", self.shpb_scaler_X.n_features_in_)
         
         # Load feature names from file if available
         try:
             feature_names = joblib.load('models/feature_names.pkl')
-            print("Expected features:", feature_names)
-        except:
-            print("Warning: Could not load feature names from models/feature_names.pkl")
+            print("\nExpected features:", feature_names)
+            print("Number of expected features:", len(feature_names))
+            
+            # Check for missing features
+            missing_features = set(feature_names) - set(inputs.columns)
+            if missing_features:
+                print("\nMissing features:", missing_features)
+        except Exception as e:
+            print("\nWarning: Could not load feature names:", str(e))
         
         scaled_inputs = self.shpb_scaler_X.transform(inputs)
         predictions = self.shpb_model.predict(scaled_inputs)
