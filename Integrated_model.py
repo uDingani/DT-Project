@@ -306,9 +306,9 @@ def main():
     # Process voltage data to create required features
     processed_data = process_voltage_data(data, voltage_cols)
     
+    
     # Create input features for SHPB model
-    # Create input features for SHPB model
-    shpb_inputs = pd.DataFrame({
+    shpb_inputs_all = pd.DataFrame({
     'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
     'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
     'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': processed_data[f'{voltage_cols[0]}_Rolling_Mean'],
