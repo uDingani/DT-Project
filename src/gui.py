@@ -10,11 +10,12 @@ import threading
 import queue
 import logging
 from typing import Optional
-
+from matplotlib.figure import Figure
 from data_acquisition import DataAcquisition
 from database import Database
 from Integrated_model import HybridModel
-
+import os
+from datetime import datetime
 class DigitalTwinGUI:
     def __init__(self, config_path='config.yaml'):
         with open(config_path, 'r') as f:
@@ -49,34 +50,40 @@ class DigitalTwinGUI:
         self.update_thread.start()
     
     def _create_control_panel(self):
-        """Create the control panel with buttons and inputs."""
+   
         control_frame = ttk.LabelFrame(self.main_container, text="Control Panel", padding="5")
         control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
-        
+    
         # Data acquisition controls
         ttk.Label(control_frame, text="Data Acquisition").grid(row=0, column=0, columnspan=2, pady=5)
         self.start_button = ttk.Button(control_frame, text="Start Acquisition", 
-                                     command=self._start_acquisition)
+                                command=self._start_acquisition)
         self.start_button.grid(row=1, column=0, padx=5, pady=2)
-        
+    
         self.stop_button = ttk.Button(control_frame, text="Stop Acquisition", 
-                                    command=self._stop_acquisition, state=tk.DISABLED)
+                                command=self._stop_acquisition, state=tk.DISABLED)
         self.stop_button.grid(row=1, column=1, padx=5, pady=2)
-        
+    
         # Model controls
         ttk.Label(control_frame, text="Model Controls").grid(row=2, column=0, columnspan=2, pady=5)
         self.load_model_button = ttk.Button(control_frame, text="Load Models", 
-                                          command=self._load_models)
+                                    command=self._load_models)
         self.load_model_button.grid(row=3, column=0, columnspan=2, padx=5, pady=2)
-        
+    
+        # Add Run Hybrid Model button here
+        self.run_model_button = ttk.Button(control_frame, text="Run Hybrid Model", 
+                                    command=self._run_hybrid_model)
+        self.run_model_button.grid(row=4, column=0, columnspan=2, padx=5, pady=2)
+    
         # SHPB parameters
-        ttk.Label(control_frame, text="SHPB Parameters").grid(row=4, column=0, columnspan=2, pady=5)
+        ttk.Label(control_frame, text="SHPB Parameters").grid(row=5, column=0, columnspan=2, pady=5)
         self.param_entries = {}
         params = ['E_bar', 'A_bar', 'A_specimen', 'L_specimen', 'c0', 'static_strength', 'L_bar', 'k']
         for i, param in enumerate(params):
-            ttk.Label(control_frame, text=param).grid(row=5+i, column=0, padx=5, pady=2)
+            ttk.Label(control_frame, text=param).grid(row=6+i, column=0, padx=5, pady=2)
             self.param_entries[param] = ttk.Entry(control_frame)
-            self.param_entries[param].grid(row=5+i, column=1, padx=5, pady=2)
+            self.param_entries[param].grid(row=6+i, column=1, padx=5, pady=2)
+
     
     def _create_display_area(self):
         """Create the display area with plots and status."""
@@ -176,12 +183,76 @@ class DigitalTwinGUI:
             
         except Exception as e:
             logging.error(f"Error updating plots: {e}")
+    def _run_hybrid_model(self):
     
+        try:
+            # Get data from data acquisition
+            time_data = self.data_acquisition.time_buffer
+            voltage_data = self.data_acquisition.data_buffer
+        
+            # Create a DataFrame from the acquired data
+            data = pd.DataFrame()
+        
+            # Add time column
+            data['Time'] = time_data
+        
+            # Add voltage columns
+            for channel_name, values in voltage_data.items():
+                data[f'Voltage (V) - {channel_name}'] = values
+        
+            # Import the hybrid model
+            from Integrated_model import main as run_hybrid_model
+        
+            # Run the model with the acquired data
+            results_df, predictions_df, experiment_id = run_hybrid_model(input_data=data)
+        
+            # Update display with results
+            self._update_results_display(results_df, predictions_df)
+        
+            # Show success message
+            messagebox.showinfo("Model Run Complete", 
+                        f"Hybrid model analysis complete.\nExperiment ID: {experiment_id}")
+        
+        except Exception as e:
+            # Show error message
+            messagebox.showerror("Model Error", f"Error running hybrid model: {str(e)}")
+            # Log the error
+            logging.error(f"Error running hybrid model: {str(e)}", exc_info=True)
+    def _update_results_display(self, results_df, predictions_df):
+        # Clear previous plots
+        for widget in self.plot_frame.winfo_children():
+            widget.destroy()
+    
+        # Create a figure for the plot
+        fig = Figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
+    
+        # Plot stress-strain curve
+        ax.plot(predictions_df['Strain'], predictions_df['Stress'], 'b-', label='Stress-Strain Curve')
+    
+        # Add labels and title
+        ax.set_xlabel('Strain (ε)')
+        ax.set_ylabel('Stress (Pa)')
+        ax.set_title('Stress-Strain Curve')
+        ax.grid(True)
+        ax.legend()
+    
+        # Create a canvas to display the plot
+        canvas = FigureCanvasTkAgg(fig, master=self.plot_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+    
+        # Add toolbar
+        toolbar = NavigationToolbar2Tk(canvas, self.plot_frame)
+        toolbar.update()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
     def run(self):
         """Start the GUI main loop."""
         self.root.mainloop()
         self.is_running = False
         self.update_thread.join()
+    
 
 if __name__ == "__main__":
     gui = DigitalTwinGUI()

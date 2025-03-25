@@ -229,44 +229,30 @@ def create_sequences_chunked(data, time_steps, stride=1):
     
     return sequences
 
-def process_voltage_data(data, voltage_cols):
-    """Process voltage data to create required features."""
-    # Create features for incident bar (ai0)
-    incident_col = voltage_cols[0]
-    data[f'{incident_col}_Diff'] = data[incident_col].diff()
-    data[f'{incident_col}_Rolling_Mean'] = data[incident_col].rolling(window=10).mean()
-    data[f'{incident_col}_Rolling_Std'] = data[incident_col].rolling(window=10).std()
+def process_voltage_data(data, voltage_cols=None):
+    if voltage_cols is None:
+        voltage_cols = [col for col in data.columns if 'voltage' in col.lower()]
+        if len(voltage_cols) < 2:
+            raise ValueError("Input data must contain voltage readings from both incident and transmission bars")
     
-    # Create features for transmission bar (ai1)
-    transmission_col = voltage_cols[1]
-    data[f'{transmission_col}_Diff'] = data[transmission_col].diff()
-    data[f'{transmission_col}_Rolling_Mean'] = data[transmission_col].rolling(window=10).mean()
-    data[f'{transmission_col}_Rolling_Std'] = data[transmission_col].rolling(window=10).std()
+    # Create a copy to avoid modifying the original
+    processed_data = data.copy()
     
-    # Create ratio and difference features
-    data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = data[incident_col] / data[transmission_col]
-    data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = data[incident_col] - data[transmission_col]
-    
-    # Fill NaN values with forward fill then backward fill
-    data = data.ffill().bfill()
-    
-    return data
+    # Process voltage data to create required features
+    return process_voltage_data(processed_data, voltage_cols)
 
 
-def main():
+def main(input_data=None, config_path='config.yaml'):
+    """Run the hybrid model with either file data or provided data."""
     # Create results directory if it doesn't exist
     if not os.path.exists('results'):
         os.makedirs('results')
     
     # Load configuration
-    config = load_config()
-    
-    # Initialize database
-    db = Database()
+    config = load_config(config_path)
     
     # Check if required files exist
     required_files = {
-        'data/new_data.xlsx': 'Input data file',
         'models/strain_gauge_lstm_model.keras': 'Strain gauge model',
         'models/scaler.pkl': 'Strain scaler',
         'models/shpb_digital_twin_model.pkl': 'SHPB model',
@@ -288,32 +274,41 @@ def main():
     # Initialize hybrid model
     hybrid_model = HybridModel(strain_model, shpb_model, strain_scaler, shpb_scaler_X, shpb_scaler_y)
     
-    # Get SHPB parameters from config or user input
+    # Get SHPB parameters from config
     shpb_params = config['models']['shpb']['parameters']
     
-    # Load and process voltage data
-    data = pd.read_excel('data/new_data.xlsx')
-    time_cols, voltage_cols = identify_columns(data)
+    # Load and process data
+    if input_data is None:
+        # Use default file if no data provided
+        if not os.path.exists('data/new_data.xlsx'):
+            raise FileNotFoundError("Input data file not found: data/new_data.xlsx")
+        data = pd.read_excel('data/new_data.xlsx')
+    else:
+        # Use provided data
+        data = input_data
     
     if len(voltage_cols) < 2:
         raise ValueError("Input data must contain voltage readings from both incident and transmission bars")
     
     # Process voltage data to create required features
     processed_data = process_voltage_data(data, voltage_cols)
+    # Identify time and voltage columns
+    time_cols, voltage_cols = identify_columns(data)
     
+    # Process voltage data to create required features
+    processed_data = process_voltage_data(data, voltage_cols)
     
     # Create input features for SHPB model
-    shpb_inputs_all = pd.DataFrame({
-    'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
-    'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
-    'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': processed_data[f'{voltage_cols[0]}_Rolling_Mean'],
-    'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': processed_data[f'{voltage_cols[0]}_Rolling_Std'],
-    'Voltage (V) - PXI1Slot4/ai1': processed_data[voltage_cols[1]],
-    'Voltage (V) - PXI1Slot4/ai1_Diff': processed_data[f'{voltage_cols[1]}_Diff'],
-    'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
-    'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
-    'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'],
-    'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
+    shpb_inputs = pd.DataFrame({
+        'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
+        'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
+        'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': processed_data[f'{voltage_cols[0]}_Rolling_Mean'],
+        'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': processed_data[f'{voltage_cols[0]}_Rolling_Std'],
+        'Voltage (V) - PXI1Slot4/ai1': processed_data[voltage_cols[1]],
+        'Voltage (V) - PXI1Slot4/ai1_Diff': processed_data[f'{voltage_cols[1]}_Diff'],
+        'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
+        'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
+        'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
     })
     #A version with only 9 features
     shpb_inputs = shpb_inputs_all.drop(columns=['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'])
