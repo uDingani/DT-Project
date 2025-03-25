@@ -307,26 +307,8 @@ def main():
     # Get reliable indices from the last iteration
     sequences = create_sequences_chunked(strain_data, time_steps=50, stride=1)
     base_reliability = hybrid_model.predict_strain_reliability(sequences)
-    
-    # Convert final_stress to numpy array and ensure it's 1D
-    final_stress = np.array(final_stress).flatten()
-    static_strength = float(shpb_params['static_strength'])
-    
-    stress_factor = np.clip(final_stress / static_strength, 0, 1)
+    stress_factor = np.clip(final_stress / shpb_params['static_strength'], 0, 1)
     reliability_adjustment = 1 - stress_factor
-    
-    # Ensure shapes match for multiplication
-    if len(reliability_adjustment.shape) == 1:
-        reliability_adjustment = reliability_adjustment.reshape(-1, 1)
-    if len(base_reliability.shape) == 1:
-        base_reliability = base_reliability.reshape(-1, 1)
-        
-    # Trim reliability_adjustment to match base_reliability shape if needed
-    if reliability_adjustment.shape[0] > base_reliability.shape[0]:
-        reliability_adjustment = reliability_adjustment[:base_reliability.shape[0]]
-    elif reliability_adjustment.shape[0] < base_reliability.shape[0]:
-        base_reliability = base_reliability[:reliability_adjustment.shape[0]]
-        
     adjusted_reliability = base_reliability * reliability_adjustment
     reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= hybrid_model.reliability_threshold]
     
@@ -338,15 +320,18 @@ def main():
         'Stress': np.nan
     })
     
-    # Ensure reliable_indices and final_stress have matching lengths
-    if len(reliable_indices) > len(final_stress):
-        reliable_indices = reliable_indices[:len(final_stress)]
-    elif len(reliable_indices) < len(final_stress):
-        final_stress = final_stress[:len(reliable_indices)]
+    # Handle final_stress array dimensions dynamically
+    if len(final_stress.shape) == 1:
+        stress_values = final_stress
+    elif len(final_stress.shape) == 2:
+        stress_values = final_stress[:, 0]
+    elif len(final_stress.shape) == 3:
+        stress_values = final_stress[:, 0, 0]
+    else:
+        raise ValueError(f"Unexpected number of dimensions in final_stress: {len(final_stress.shape)}")
     
-    # Assign values to the DataFrame
-    results_df.loc[reliable_indices, 'Reliable_Strain'] = reliable_strain[:len(reliable_indices)]
-    results_df.loc[reliable_indices, 'Stress'] = final_stress[:len(reliable_indices)]
+    results_df.loc[reliable_indices, 'Reliable_Strain'] = reliable_strain
+    results_df.loc[reliable_indices, 'Stress'] = stress_values
     
     # Save experiment data
     experiment_id = db.save_experiment(
@@ -364,7 +349,7 @@ def main():
     predictions_df = pd.DataFrame({
         'Time': data[time_cols[0]].values[reliable_indices],
         'Strain': reliable_strain,
-        'Stress': final_stress[:, 0]
+        'Stress': stress_values
     })
     
     # Create results directory if it doesn't exist
@@ -375,7 +360,7 @@ def main():
     plt.figure(figsize=(10, 6))
     
     # Plot stress vs strain
-    plt.plot(reliable_strain[:len(reliable_indices)], final_stress[:len(reliable_indices)], 'b-', label='Stress-Strain Curve')
+    plt.plot(reliable_strain[:len(reliable_indices)], stress_values[:len(reliable_indices)], 'b-', label='Stress-Strain Curve')
     
     # Add labels and title
     plt.xlabel('Strain (ε)')
@@ -401,12 +386,12 @@ def main():
     print("\nFinal Results:")
     print(f"Number of reliable strain measurements: {len(reliable_strain)}")
     print("\nPredicted stress (Pa):")
-    for i, stress in enumerate(final_stress[:, 0]):
+    for i, stress in enumerate(stress_values):
         print(f"Sample {i+1}: {stress:.2e} Pa")
     
     # Calculate and display statistics
-    mean_stress = np.mean(final_stress[:, 0])
-    std_stress = np.std(final_stress[:, 0])
+    mean_stress = np.mean(stress_values)
+    std_stress = np.std(stress_values)
     print(f"\nStatistics:")
     print(f"Mean stress: {mean_stress:.2e} Pa")
     print(f"Standard deviation: {std_stress:.2e} Pa")
