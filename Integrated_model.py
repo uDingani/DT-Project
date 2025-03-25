@@ -333,16 +333,43 @@ def main():
     final_stress_array = np.asarray(final_stress, dtype=np.float64)
     static_strength = float(shpb_params['static_strength'])
     
+    print(f"Shape of final_stress_array: {final_stress_array.shape}")
+    print(f"Shape of base_reliability: {base_reliability.shape}")
+    
+    if len(final_stress_array.shape) == 2:
+        final_stress_values = final_stress_array.flatten()
+    
+    else:
+        final_stress_values = final_stress_array
+        
     if len(final_stress_array) < len(base_reliability):
         padding_length = len(base_reliability) - len(final_stress_array)
-        final_stress_padded = np.concatenate([final_stress_array, 
-        np.repeat(final_stress_array[-1], padding_length)])
-    else:
-        final_stress_padded = final_stress_array[:len(base_reliability)]
         
-    stress_factor = np.clip(final_stress_array / static_strength, 0, 1)
+        if len(final_stress_values) > 0:  
+            padding_value = final_stress_values[-1]
+            padding_array = np.full(padding_length, padding_value)
+        
+            final_stress_padded = np.concatenate([final_stress_values, padding_array])
+        else:
+            final_stress_padded = np.zeros(len(base_reliability))
+    else:
+        final_stress_padded = final_stress_values[:len(base_reliability)]
+    
+    if len(base_reliability.shape) == 2 and len(final_stress_padded.shape) == 1:
+        final_stress_padded = final_stress_padded.reshape(-1, 1)    
+    
+    
+    stress_factor = np.clip(final_stress_padded / static_strength, 0, 1)
     reliability_adjustment = 1 - stress_factor
-    adjusted_reliability = base_reliability * reliability_adjustment
+    
+    print(f"Shape of reliability_adjustment: {reliability_adjustment.shape}")
+    
+    min_length = min(len(base_reliability), len(reliability_adjustment))
+    base_reliability_trimmed = base_reliability[:min_length]
+    reliability_adjustment_trimmed = reliability_adjustment[:min_length]
+    
+    
+    adjusted_reliability = base_reliability_trimmed * reliability_adjustment_trimmed
     reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= hybrid_model.reliability_threshold]
     
     # Prepare results for storage
