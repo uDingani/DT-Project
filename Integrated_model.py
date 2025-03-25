@@ -50,6 +50,11 @@ class HybridModel(BaseEstimator):
             missing_features = set(feature_names) - set(inputs.columns)
             if missing_features:
                 print("\nMissing features:", missing_features)
+                
+            # Check for extra features
+            extra_features = set(inputs.columns) - set(feature_names)
+            if extra_features:
+                print("\nExtra features:", extra_features)
         except Exception as e:
             print("\nWarning: Could not load feature names:", str(e))
         
