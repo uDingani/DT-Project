@@ -372,13 +372,9 @@ def main():
     adjusted_reliability = base_reliability_trimmed * reliability_adjustment_trimmed
     reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= hybrid_model.reliability_threshold]
     
-    # Prepare results for storage
-    results_df = pd.DataFrame({
-        'Time': data[time_cols[0]].values,
-        'Strain': strain_data,
-        'Reliable_Strain': np.nan,
-        'Stress': np.nan
-    })
+    print(f"Length of reliable_indices: {len(reliable_indices)}")
+    print(f"Length of reliable_strain: {len(reliable_strain)}")
+    
     
     # Handle final_stress array dimensions dynamically
     if len(final_stress.shape) == 1:
@@ -390,7 +386,21 @@ def main():
     else:
         raise ValueError(f"Unexpected number of dimensions in final_stress: {len(final_stress.shape)}")
     
+    print(f"Length of stress_values: {len(stress_values)}")
+    min_reliable_length = min(len(reliable_indices), len(reliable_strain), len(stress_values))
+    reliable_indices = reliable_indices[:min_reliable_length]
+    reliable_strain = reliable_strain[:min_reliable_length]
     stress_values = stress_values[:min_reliable_length]
+    
+    # Prepare results for storage
+    results_df = pd.DataFrame({
+        'Time': data[time_cols[0]].values,
+        'Strain': strain_data,
+        'Reliable_Strain': np.nan,
+        'Stress': np.nan
+    })
+    
+    
     
     for i, idx in enumerate(reliable_indices):
         if idx < len(results_df):
