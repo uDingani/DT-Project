@@ -363,9 +363,13 @@ def main():
     # Save predictions
     predictions_df = pd.DataFrame({
         'Time': data[time_cols[0]].values[reliable_indices],
-        'Strain': reliable_strain[:len(reliable_indices)],
-        'Stress': final_stress[:len(reliable_indices)]
+        'Strain': reliable_strain,
+        'Stress': final_stress[:, 0]
     })
+    
+    # Create results directory if it doesn't exist
+    if not os.path.exists('results'):
+        os.makedirs('results')
     
     # Create stress-strain curve plot
     plt.figure(figsize=(10, 6))
@@ -381,41 +385,34 @@ def main():
     plt.legend()
     
     # Save the plot
-    plt.savefig('results/stress_strain_curve.png')
+    plot_path = os.path.join('results', f'stress_strain_curve_{experiment_id}.png')
+    plt.savefig(plot_path)
     plt.close()
     
-    # Add plot information to metadata
-    metadata = {
-        'experiment_id': datetime.now().strftime('%Y%m%d_%H%M%S'),
-        'model_version': '1.0',
-        'reliability_threshold': hybrid_model.reliability_threshold,
-        'iterations': hybrid_model.max_iterations,
-        'plot_path': 'results/stress_strain_curve.png'
-    }
-    
+    # Save predictions
     db.save_predictions(
         model_name='hybrid_model',
         predictions=predictions_df,
         actual_values=results_df,
-        experiment_id=experiment_id,
-        metadata=metadata
+        experiment_id=experiment_id
     )
     
     # Output results
     print("\nFinal Results:")
     print(f"Number of reliable strain measurements: {len(reliable_strain)}")
     print("\nPredicted stress (Pa):")
-    for i, stress in enumerate(final_stress):
+    for i, stress in enumerate(final_stress[:, 0]):
         print(f"Sample {i+1}: {stress:.2e} Pa")
     
     # Calculate and display statistics
-    mean_stress = np.mean(final_stress)
-    std_stress = np.std(final_stress)
+    mean_stress = np.mean(final_stress[:, 0])
+    std_stress = np.std(final_stress[:, 0])
     print(f"\nStatistics:")
     print(f"Mean stress: {mean_stress:.2e} Pa")
     print(f"Standard deviation: {std_stress:.2e} Pa")
     
     print(f"\nResults saved to experiment ID: {experiment_id}")
+    print(f"Stress-strain curve saved to: {plot_path}")
 
 if __name__ == "__main__":
     main() 
