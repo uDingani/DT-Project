@@ -68,10 +68,9 @@ class HybridModel(BaseEstimator):
         return self.strain_model.predict(scaled_sequences)
     
     def predict_shpb(self, inputs):
-         if 'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1' not in inputs.columns:
-        # Calculate the difference between the two voltage columns
-        inputs['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = (
-            inputs['Voltage (V) - PXI1Slot4/ai0'] - inputs['Voltage (V) - PXI1Slot4/ai1']
+        if 'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1' not in inputs.columns:
+            # Calculate the difference between the two voltage columns
+            inputs['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = inputs['Voltage (V) - PXI1Slot4/ai0'] - inputs['Voltage (V) - PXI1Slot4/ai1']
         # Print input columns for debugging
         print("\nInput columns:", inputs.columns.tolist())
         print("Number of input features:", len(inputs.columns))
