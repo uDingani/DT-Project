@@ -71,6 +71,7 @@ class HybridModel(BaseEstimator):
         if 'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1' not in inputs.columns:
             # Calculate the difference between the two voltage columns
             inputs['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = inputs['Voltage (V) - PXI1Slot4/ai0'] - inputs['Voltage (V) - PXI1Slot4/ai1']
+
         # Print input columns for debugging
         print("\nInput columns:", inputs.columns.tolist())
         print("Number of input features:", len(inputs.columns))
@@ -315,7 +316,7 @@ shpb_inputs = pd.DataFrame({
     'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
     'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'],
     'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
-})
+    })
 
     # Get initial stress predictions
     initial_stress = hybrid_model.predict_shpb(shpb_inputs)
