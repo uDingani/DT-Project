@@ -141,6 +141,29 @@ def generate_strain_features(data, cols):
 def create_sequences_chunked(data, time_steps, stride=1):
     return np.array([data[i:i+time_steps] for i in range(0, len(data)-time_steps, stride)])
 
+def process_voltage_data(data, voltage_cols):
+    """Process voltage data to create required features."""
+    # Create features for incident bar (ai0)
+    incident_col = voltage_cols[0]
+    data[f'{incident_col}_Diff'] = data[incident_col].diff()
+    data[f'{incident_col}_Rolling_Mean'] = data[incident_col].rolling(window=10).mean()
+    data[f'{incident_col}_Rolling_Std'] = data[incident_col].rolling(window=10).std()
+    
+    # Create features for transmission bar (ai1)
+    transmission_col = voltage_cols[1]
+    data[f'{transmission_col}_Diff'] = data[transmission_col].diff()
+    data[f'{transmission_col}_Rolling_Mean'] = data[transmission_col].rolling(window=10).mean()
+    data[f'{transmission_col}_Rolling_Std'] = data[transmission_col].rolling(window=10).std()
+    
+    # Create ratio and difference features
+    data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = data[incident_col] / data[transmission_col]
+    data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = data[incident_col] - data[transmission_col]
+    
+    # Fill NaN values with forward fill then backward fill
+    data = data.fillna(method='ffill').fillna(method='bfill')
+    
+    return data
+
 def main():
     # Load configuration
     config = load_config()
@@ -175,24 +198,35 @@ def main():
     # Get SHPB parameters from config or user input
     shpb_params = config['models']['shpb']['parameters']
     
-    # Load and process strain gauge data
+    # Load and process voltage data
     data = pd.read_excel('data/new_data.xlsx')
     time_cols, voltage_cols = identify_columns(data)
-    features = generate_strain_features(data, voltage_cols)
-    strain_data = data[voltage_cols[0]].values * shpb_params['k']
     
-    # Initial SHPB prediction
-    initial_shpb_inputs = pd.DataFrame({
-        'E_bar': [shpb_params['E_bar']] * len(strain_data),
-        'A_bar': [shpb_params['A_bar']] * len(strain_data),
-        'A_specimen': [shpb_params['A_specimen']] * len(strain_data),
-        'L_specimen': [shpb_params['L_specimen']] * len(strain_data),
-        'c0': [shpb_params['c0']] * len(strain_data),
-        'static_strength': [shpb_params['static_strength']] * len(strain_data),
-        'L_bar': [shpb_params['L_bar']] * len(strain_data),
-        'eps_t': strain_data
+    if len(voltage_cols) < 2:
+        raise ValueError("Input data must contain voltage readings from both incident and transmission bars")
+    
+    # Process voltage data to create required features
+    processed_data = process_voltage_data(data, voltage_cols)
+    
+    # Create input features for SHPB model
+    shpb_inputs = pd.DataFrame({
+        'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
+        'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
+        'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': processed_data[f'{voltage_cols[0]}_Rolling_Mean'],
+        'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': processed_data[f'{voltage_cols[0]}_Rolling_Std'],
+        'Voltage (V) - PXI1Slot4/ai1': processed_data[voltage_cols[1]],
+        'Voltage (V) - PXI1Slot4/ai1_Diff': processed_data[f'{voltage_cols[1]}_Diff'],
+        'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
+        'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
+        'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'],
+        'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
     })
-    initial_stress = hybrid_model.predict_shpb(initial_shpb_inputs)
+    
+    # Get initial stress predictions
+    initial_stress = hybrid_model.predict_shpb(shpb_inputs)
+    
+    # Calculate strain data from voltage
+    strain_data = processed_data[voltage_cols[0]].values * shpb_params['k']
     
     # Refine predictions using hybrid model
     final_stress, reliable_strain = hybrid_model.refine_predictions(strain_data, shpb_params, initial_stress)
