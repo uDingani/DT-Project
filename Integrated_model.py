@@ -34,17 +34,33 @@ class HybridModel(BaseEstimator):
         if len(sequences.shape) == 2:
             sequences = sequences.reshape(sequences.shape[0], sequences.shape[1], 1)
             
-        # Scale the sequences
+        # Create a DataFrame with all required features
         n_samples = sequences.shape[0]
         n_timesteps = sequences.shape[1]
-        n_features = sequences.shape[2]
         
-        # Reshape for scaling
-        reshaped_sequences = sequences.reshape(-1, n_features)
-        scaled_sequences = self.strain_scaler.transform(reshaped_sequences)
+        # Create a DataFrame with the strain data and derived features
+        strain_data = sequences.reshape(-1, 1)
+        strain_df = pd.DataFrame({
+            'Voltage (V) - PXI1Slot4/ai0': strain_data.flatten(),
+            'Voltage (V) - PXI1Slot4/ai0_Diff': np.diff(strain_data.flatten(), prepend=strain_data[0]),
+            'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': pd.Series(strain_data.flatten()).rolling(window=10).mean(),
+            'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': pd.Series(strain_data.flatten()).rolling(window=10).std(),
+            'Voltage (V) - PXI1Slot4/ai1': strain_data.flatten(),  # Using same data for both bars
+            'Voltage (V) - PXI1Slot4/ai1_Diff': np.diff(strain_data.flatten(), prepend=strain_data[0]),
+            'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': pd.Series(strain_data.flatten()).rolling(window=10).mean(),
+            'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': pd.Series(strain_data.flatten()).rolling(window=10).std(),
+            'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': np.ones_like(strain_data.flatten()),
+            'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': np.zeros_like(strain_data.flatten())
+        })
         
-        # Reshape back to 3D
-        scaled_sequences = scaled_sequences.reshape(n_samples, n_timesteps, n_features)
+        # Fill NaN values
+        strain_df = strain_df.fillna(method='ffill').fillna(method='bfill')
+        
+        # Scale the features
+        scaled_features = self.strain_scaler.transform(strain_df)
+        
+        # Reshape back to 3D for LSTM model
+        scaled_sequences = scaled_features.reshape(n_samples, n_timesteps, -1)
         
         # Make predictions
         return self.strain_model.predict(scaled_sequences)
