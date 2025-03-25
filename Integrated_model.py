@@ -28,7 +28,25 @@ class HybridModel(BaseEstimator):
         self.convergence_threshold = 1e-6
         
     def predict_strain_reliability(self, sequences):
-        scaled_sequences = self.strain_scaler.transform(sequences.reshape(-1, sequences.shape[2])).reshape(sequences.shape)
+        # Ensure sequences is a 3D array (samples, time_steps, features)
+        if len(sequences.shape) == 1:
+            sequences = sequences.reshape(-1, 1)
+        if len(sequences.shape) == 2:
+            sequences = sequences.reshape(sequences.shape[0], sequences.shape[1], 1)
+            
+        # Scale the sequences
+        n_samples = sequences.shape[0]
+        n_timesteps = sequences.shape[1]
+        n_features = sequences.shape[2]
+        
+        # Reshape for scaling
+        reshaped_sequences = sequences.reshape(-1, n_features)
+        scaled_sequences = self.strain_scaler.transform(reshaped_sequences)
+        
+        # Reshape back to 3D
+        scaled_sequences = scaled_sequences.reshape(n_samples, n_timesteps, n_features)
+        
+        # Make predictions
         return self.strain_model.predict(scaled_sequences)
     
     def predict_shpb(self, inputs):
@@ -145,7 +163,22 @@ def generate_strain_features(data, cols):
     return features
 
 def create_sequences_chunked(data, time_steps, stride=1):
-    return np.array([data[i:i+time_steps] for i in range(0, len(data)-time_steps, stride)])
+    """Create sequences from data with proper reshaping."""
+    # Ensure data is 1D
+    if len(data.shape) > 1:
+        data = data.flatten()
+        
+    # Create sequences
+    sequences = []
+    for i in range(0, len(data) - time_steps, stride):
+        sequences.append(data[i:i + time_steps])
+    
+    # Convert to numpy array and reshape to 3D (samples, time_steps, features)
+    sequences = np.array(sequences)
+    if len(sequences.shape) == 2:
+        sequences = sequences.reshape(sequences.shape[0], sequences.shape[1], 1)
+    
+    return sequences
 
 def process_voltage_data(data, voltage_cols):
     """Process voltage data to create required features."""
