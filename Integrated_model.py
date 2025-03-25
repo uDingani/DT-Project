@@ -98,6 +98,9 @@ class HybridModel(BaseEstimator):
         except Exception as e:
             print("\nWarning: Could not load feature names:", str(e))
         
+        if len(inputs.columns) != self.shpb_scaler_X.n_features_in_:
+            print(f"\nWarning: Input has {len(inputs.columns)} features, but scaler expects {self.shpb_scaler_X.n_features_in_}")
+        
         scaled_inputs = self.shpb_scaler_X.transform(inputs)
         predictions = self.shpb_model.predict(scaled_inputs)
         return self.shpb_scaler_y.inverse_transform(predictions)
