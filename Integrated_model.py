@@ -68,42 +68,37 @@ class HybridModel(BaseEstimator):
         return self.strain_model.predict(scaled_sequences)
     
     def predict_shpb(self, inputs):
-        if 'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1' not in inputs.columns:
-            # Calculate the difference between the two voltage columns
-            inputs['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'] = inputs['Voltage (V) - PXI1Slot4/ai0'] - inputs['Voltage (V) - PXI1Slot4/ai1']
-
         # Print input columns for debugging
         print("\nInput columns:", inputs.columns.tolist())
         print("Number of input features:", len(inputs.columns))
-        
+    
         # Print scaler information
         print("\nScaler information:")
         print("Number of features expected by scaler:", self.shpb_scaler_X.n_features_in_)
-        
+    
         # Load feature names from file if available
         try:
             feature_names = joblib.load('models/feature_names.pkl')
             print("\nExpected features:", feature_names)
             print("Number of expected features:", len(feature_names))
-            
-            # Check for missing features
-            missing_features = set(feature_names) - set(inputs.columns)
-            if missing_features:
-                print("\nMissing features:", missing_features)
-                
-            # Check for extra features
-            extra_features = set(inputs.columns) - set(feature_names)
-            if extra_features:
-                print("\nExtra features:", extra_features)
         except Exception as e:
             print("\nWarning: Could not load feature names:", str(e))
-        
+    
+        # Ensure we have exactly the features the scaler expects
         if len(inputs.columns) != self.shpb_scaler_X.n_features_in_:
             print(f"\nWarning: Input has {len(inputs.columns)} features, but scaler expects {self.shpb_scaler_X.n_features_in_}")
         
-        scaled_inputs = self.shpb_scaler_X.transform(inputs)
-        predictions = self.shpb_model.predict(scaled_inputs)
-        return self.shpb_scaler_y.inverse_transform(predictions)
+            # If we have too many features, drop the extra ones
+            if len(inputs.columns) > self.shpb_scaler_X.n_features_in_:
+                # Remove the Diff_Voltage feature if it exists
+                if 'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1' in inputs.columns:
+                    inputs = inputs.drop(columns=['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'])
+                    print("Removed 'Diff_Voltage' feature to match scaler expectations.")
+    
+    scaled_inputs = self.shpb_scaler_X.transform(inputs)
+    predictions = self.shpb_model.predict(scaled_inputs)
+    return self.shpb_scaler_y.inverse_transform(predictions)
+
     
     def refine_predictions(self, strain_data, shpb_params, initial_stress):
         # Convert initial_stress to numpy array and ensure it's 1D
