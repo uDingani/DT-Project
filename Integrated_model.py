@@ -63,18 +63,19 @@ class HybridModel(BaseEstimator):
         return self.shpb_scaler_y.inverse_transform(predictions)
     
     def refine_predictions(self, strain_data, shpb_params, initial_stress):
-        current_stress = initial_stress
+        # Convert initial_stress to numpy array and ensure it's 1D
+        current_stress = np.array(initial_stress).flatten()
         iteration = 0
         
         while iteration < self.max_iterations:
             # Use stress predictions to refine strain reliability
-            stress_factor = np.clip(current_stress / shpb_params['static_strength'], 0, 1)
+            stress_factor = np.clip(current_stress / float(shpb_params['static_strength']), 0, 1)
             reliability_adjustment = 1 - stress_factor
             
             # Update strain reliability predictions
             sequences = create_sequences_chunked(strain_data, time_steps=50, stride=1)
             base_reliability = self.predict_strain_reliability(sequences)
-            adjusted_reliability = base_reliability * reliability_adjustment
+            adjusted_reliability = base_reliability * reliability_adjustment.reshape(-1, 1)
             
             # Filter reliable strains
             reliable_indices = [i + 50 for i, pred in enumerate(adjusted_reliability) if pred[0] <= self.reliability_threshold]
@@ -85,18 +86,23 @@ class HybridModel(BaseEstimator):
                 
             # Update SHPB inputs with refined strain data
             shpb_inputs = pd.DataFrame({
-                'E_bar': [shpb_params['E_bar']] * len(reliable_strain),
-                'A_bar': [shpb_params['A_bar']] * len(reliable_strain),
-                'A_specimen': [shpb_params['A_specimen']] * len(reliable_strain),
-                'L_specimen': [shpb_params['L_specimen']] * len(reliable_strain),
-                'c0': [shpb_params['c0']] * len(reliable_strain),
-                'static_strength': [shpb_params['static_strength']] * len(reliable_strain),
-                'L_bar': [shpb_params['L_bar']] * len(reliable_strain),
-                'eps_t': reliable_strain
+                'Voltage (V) - PXI1Slot4/ai0': reliable_strain / shpb_params['k'],  # Convert strain back to voltage
+                'Voltage (V) - PXI1Slot4/ai0_Diff': np.diff(reliable_strain, prepend=reliable_strain[0]) / shpb_params['k'],
+                'Voltage (V) - PXI1Slot4/ai0_Rolling_Mean': pd.Series(reliable_strain / shpb_params['k']).rolling(window=10).mean(),
+                'Voltage (V) - PXI1Slot4/ai0_Rolling_Std': pd.Series(reliable_strain / shpb_params['k']).rolling(window=10).std(),
+                'Voltage (V) - PXI1Slot4/ai1': reliable_strain / shpb_params['k'],  # Using same voltage for both bars as placeholder
+                'Voltage (V) - PXI1Slot4/ai1_Diff': np.diff(reliable_strain, prepend=reliable_strain[0]) / shpb_params['k'],
+                'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': pd.Series(reliable_strain / shpb_params['k']).rolling(window=10).mean(),
+                'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': pd.Series(reliable_strain / shpb_params['k']).rolling(window=10).std(),
+                'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': np.ones_like(reliable_strain)  # Using 1 as placeholder
             })
+            
+            # Fill NaN values
+            shpb_inputs = shpb_inputs.fillna(method='ffill').fillna(method='bfill')
             
             # Get new stress predictions
             new_stress = self.predict_shpb(shpb_inputs)
+            new_stress = np.array(new_stress).flatten()
             
             # Check convergence
             if np.abs(np.mean(new_stress) - np.mean(current_stress)) < self.convergence_threshold:
@@ -105,7 +111,7 @@ class HybridModel(BaseEstimator):
             current_stress = new_stress
             iteration += 1
             
-        return current_stress, reliable_strain
+        return current_stress.reshape(-1, 1), reliable_strain
 
 def load_config(config_path='config.yaml'):
     with open(config_path, 'r') as f:
