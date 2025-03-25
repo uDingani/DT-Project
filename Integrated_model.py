@@ -95,9 +95,9 @@ class HybridModel(BaseEstimator):
                     inputs = inputs.drop(columns=['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'])
                     print("Removed 'Diff_Voltage' feature to match scaler expectations.")
     
-    scaled_inputs = self.shpb_scaler_X.transform(inputs)
-    predictions = self.shpb_model.predict(scaled_inputs)
-    return self.shpb_scaler_y.inverse_transform(predictions)
+        scaled_inputs = self.shpb_scaler_X.transform(inputs)
+        predictions = self.shpb_model.predict(scaled_inputs)
+        return self.shpb_scaler_y.inverse_transform(predictions)
 
     
     def refine_predictions(self, strain_data, shpb_params, initial_stress):
