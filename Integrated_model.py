@@ -342,7 +342,7 @@ def main():
     else:
         final_stress_values = final_stress_array
         
-    if len(final_stress_array) < len(base_reliability):
+    if len(final_stress_values) < len(base_reliability):
         padding_length = len(base_reliability) - len(final_stress_array)
         
         if len(final_stress_values) > 0:  
@@ -389,6 +389,13 @@ def main():
         stress_values = final_stress[:, 0, 0]
     else:
         raise ValueError(f"Unexpected number of dimensions in final_stress: {len(final_stress.shape)}")
+    
+    stress_values = stress_values[:min_reliable_length]
+    
+    for i, idx in enumerate(reliable_indices):
+        if idx < len(results_df):
+            results_df.loc[idx, 'Reliable_Strain'] = reliable_strain[i]
+            results_df.loc[idx, 'Stress'] = stress_values[i]
     
     results_df.loc[reliable_indices, 'Reliable_Strain'] = reliable_strain
     results_df.loc[reliable_indices, 'Stress'] = stress_values
