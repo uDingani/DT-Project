@@ -95,8 +95,8 @@ results_df = pd.DataFrame({
     "Stress (MPa, Predicted)": stress_pred / 1e6,
     "Strain Rate (s^-1, Predicted)": strain_rate_pred
 })
-results_df.to_csv("shpb_results.csv", index=False)
-print("\nResults saved to 'shpb_results.csv'")
+results_df.to_csv("C:/Users/Busiso/Desktop/shpb_results.csv", index=False)
+print("\nResults saved to 'C:/Users/Busiso/Desktop/shpb_results.csv'")
 
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
@@ -121,6 +121,6 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-joblib.dump(model, "shpb_digital_twin_model.pkl")
-joblib.dump(scaler_X, "scaler_X.pkl")
-joblib.dump(scaler_y, "scaler_y.pkl")
+joblib.dump(model, "C:/Users/Busiso/Desktop/shpb_digital_twin_model.pkl")
+joblib.dump(scaler_X, "C:/Users/Busiso/Desktop/scaler_X.pkl")
+joblib.dump(scaler_y, "C:/Users/Busiso/Desktop/scaler_y.pkl")
