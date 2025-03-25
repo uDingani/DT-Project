@@ -304,7 +304,7 @@ def main():
     processed_data = process_voltage_data(data, voltage_cols)
     
     # Create input features for SHPB model
-  # Create input features for SHPB model
+    # Create input features for SHPB model
     shpb_inputs = pd.DataFrame({
     'Voltage (V) - PXI1Slot4/ai0': processed_data[voltage_cols[0]],
     'Voltage (V) - PXI1Slot4/ai0_Diff': processed_data[f'{voltage_cols[0]}_Diff'],
@@ -315,8 +315,10 @@ def main():
     'Voltage (V) - PXI1Slot4/ai1_Rolling_Mean': processed_data[f'{voltage_cols[1]}_Rolling_Mean'],
     'Voltage (V) - PXI1Slot4/ai1_Rolling_Std': processed_data[f'{voltage_cols[1]}_Rolling_Std'],
     'Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Ratio_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'],
+    'Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1': processed_data['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1']
     })
-
+    #A version with only 9 features
+    shpb_inputs = shpb_inputs_all.drop(columns=['Diff_Voltage (V) - PXI1Slot4/ai0_Voltage (V) - PXI1Slot4/ai1'])
     # Get initial stress predictions
     initial_stress = hybrid_model.predict_shpb(shpb_inputs)
     
