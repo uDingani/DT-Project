@@ -15,6 +15,8 @@ from sklearn.ensemble import RandomForestRegressor
 from database import Database
 import yaml
 from datetime import datetime
+import matplotlib.pyplot as plt
+
 #df
 class HybridModel(BaseEstimator):
     def __init__(self, strain_model, shpb_model, strain_scaler, shpb_scaler_X, shpb_scaler_y):
@@ -233,6 +235,10 @@ def process_voltage_data(data, voltage_cols):
     return data
 
 def main():
+    # Create results directory if it doesn't exist
+    if not os.path.exists('results'):
+        os.makedirs('results')
+    
     # Load configuration
     config = load_config()
     
@@ -361,11 +367,38 @@ def main():
         'Stress': final_stress[:len(reliable_indices)]
     })
     
+    # Create stress-strain curve plot
+    plt.figure(figsize=(10, 6))
+    
+    # Plot stress vs strain
+    plt.plot(reliable_strain[:len(reliable_indices)], final_stress[:len(reliable_indices)], 'b-', label='Stress-Strain Curve')
+    
+    # Add labels and title
+    plt.xlabel('Strain (ε)')
+    plt.ylabel('Stress (Pa)')
+    plt.title('Stress-Strain Curve')
+    plt.grid(True)
+    plt.legend()
+    
+    # Save the plot
+    plt.savefig('results/stress_strain_curve.png')
+    plt.close()
+    
+    # Add plot information to metadata
+    metadata = {
+        'experiment_id': datetime.now().strftime('%Y%m%d_%H%M%S'),
+        'model_version': '1.0',
+        'reliability_threshold': hybrid_model.reliability_threshold,
+        'iterations': hybrid_model.max_iterations,
+        'plot_path': 'results/stress_strain_curve.png'
+    }
+    
     db.save_predictions(
         model_name='hybrid_model',
         predictions=predictions_df,
         actual_values=results_df,
-        experiment_id=experiment_id
+        experiment_id=experiment_id,
+        metadata=metadata
     )
     
     # Output results
