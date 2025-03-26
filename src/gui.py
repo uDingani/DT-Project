@@ -99,8 +99,16 @@ class DigitalTwinGUI:
         self._apply_custom_style()
         
         # Create main container
-        self.main_container = ttk.Frame(self.root, padding="10")
+        self.main_container = ttk.Frame(self.root, padding="10", style="TFrame")
         self.main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Configure grid weights
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        self.main_container.columnconfigure(0, weight=1)
+        self.main_container.columnconfigure(1, weight=3)  # Display area gets more space
+        self.main_container.rowconfigure(0, weight=1)
+
         
         # Create control panel
         self._create_control_panel()
@@ -154,7 +162,7 @@ class DigitalTwinGUI:
         style.configure("Display.TLabelframe.Label", foreground=text_color, background=primary_color, 
                 font=('Arial', 11, 'bold'))
     
-    # Create a custom style for buttons
+        # Create a custom style for buttons
         style.configure("Start.TButton", foreground=text_color, background="#4caf50", font=('Arial', 9, 'bold'))
         style.map("Start.TButton",
             foreground=[('pressed', text_color), ('active', text_color)],
@@ -170,56 +178,74 @@ class DigitalTwinGUI:
             foreground=[('pressed', text_color), ('active', text_color)],
             background=[('pressed', primary_color), ('active', "#ba68c8")])
     def _create_control_panel(self):
-   
-        control_frame = ttk.LabelFrame(self.main_container, text="Control Panel", padding="5")
-        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
+        """Create the control panel with buttons and inputs."""
+        control_frame = ttk.LabelFrame(self.main_container, text="Control Panel", padding="10", style="Control.TLabelframe")
+        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
     
         # Data acquisition controls
-        ttk.Label(control_frame, text="Data Acquisition").grid(row=0, column=0, columnspan=2, pady=5)
+        ttk.Label(control_frame, text="Data Acquisition", font=('Arial', 10, 'bold')).grid(row=0, column=0, columnspan=2, pady=8)
         self.start_button = ttk.Button(control_frame, text="Start Acquisition", 
-                                command=self._start_acquisition)
-        self.start_button.grid(row=1, column=0, padx=5, pady=2)
+                                command=self._start_acquisition, style="Start.TButton")
+        self.start_button.grid(row=1, column=0, padx=5, pady=5)
     
         self.stop_button = ttk.Button(control_frame, text="Stop Acquisition", 
-                                command=self._stop_acquisition, state=tk.DISABLED)
-        self.stop_button.grid(row=1, column=1, padx=5, pady=2)
+                                command=self._stop_acquisition, state=tk.DISABLED, style="Stop.TButton")
+        self.stop_button.grid(row=1, column=1, padx=5, pady=5)
     
         # Model controls
-        ttk.Label(control_frame, text="Model Controls").grid(row=2, column=0, columnspan=2, pady=5)
+        ttk.Label(control_frame, text="Model Controls", font=('Arial', 10, 'bold')).grid(row=2, column=0, columnspan=2, pady=8)
         self.load_model_button = ttk.Button(control_frame, text="Load Models", 
-                                    command=self._load_models)
-        self.load_model_button.grid(row=3, column=0, columnspan=2, padx=5, pady=2)
+                                    command=self._load_models, style="Model.TButton")
+        self.load_model_button.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
     
         # Add Run Hybrid Model button here
         self.run_model_button = ttk.Button(control_frame, text="Run Hybrid Model", 
-                                    command=self._run_hybrid_model)
-        self.run_model_button.grid(row=4, column=0, columnspan=2, padx=5, pady=2)
+                                    command=self._run_hybrid_model, style="Model.TButton")
+        self.run_model_button.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
     
         # SHPB parameters
-        ttk.Label(control_frame, text="SHPB Parameters").grid(row=5, column=0, columnspan=2, pady=5)
+        ttk.Label(control_frame, text="SHPB Parameters", font=('Arial', 10, 'bold')).grid(row=5, column=0, columnspan=2, pady=8)
         self.param_entries = {}
         params = ['E_bar', 'A_bar', 'A_specimen', 'L_specimen', 'c0', 'static_strength', 'L_bar', 'k']
         for i, param in enumerate(params):
-            ttk.Label(control_frame, text=param).grid(row=6+i, column=0, padx=5, pady=2)
-            self.param_entries[param] = ttk.Entry(control_frame)
-            self.param_entries[param].grid(row=6+i, column=1, padx=5, pady=2)
+        ttk.Label(control_frame, text=param).grid(row=6+i, column=0, padx=5, pady=3, sticky=tk.W)
+        self.param_entries[param] = ttk.Entry(control_frame)
+        self.param_entries[param].grid(row=6+i, column=1, padx=5, pady=3, sticky=(tk.W, tk.E))
 
-    
     def _create_display_area(self):
         """Create the display area with plots and status."""
-        display_frame = ttk.LabelFrame(self.main_container, text="Display Area", padding="5")
-        display_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
-        
-        # Create matplotlib figure
-        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(8, 8))
+        display_frame = ttk.LabelFrame(self.main_container, text="Display Area", padding="10", style="Display.TLabelframe")
+        display_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
+    
+        # Create matplotlib figure with custom styling
+        plt.style.use('dark_background')  # Use dark background for plots
+        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(8, 8), facecolor='#424242')
+    
+        # Customize plot appearance
+        for ax in [self.ax1, self.ax2]:
+        ax.set_facecolor('#616161')  # Set plot background
+        ax.tick_params(colors='#f5f5f5')  # Set tick colors
+        ax.xaxis.label.set_color('#f5f5f5')  # Set x-axis label color
+        ax.yaxis.label.set_color('#f5f5f5')  # Set y-axis label color
+        ax.title.set_color('#f5f5f5')  # Set title color
+        ax.spines['bottom'].set_color('#9c27b0')  # Set axis color
+        ax.spines['top'].set_color('#9c27b0')
+        ax.spines['left'].set_color('#9c27b0')
+        ax.spines['right'].set_color('#9c27b0')
+        ax.grid(True, linestyle='--', alpha=0.7, color='#9e9e9e')
+    
         self.canvas = FigureCanvasTkAgg(self.fig, master=display_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        # Status display
-        self.status_var = tk.StringVar(value="Ready")
-        status_label = ttk.Label(display_frame, textvariable=self.status_var)
-        status_label.pack(fill=tk.X, pady=5)
     
+        # Status display with custom styling
+        status_frame = ttk.Frame(display_frame, style="TFrame")
+        status_frame.pack(fill=tk.X, pady=5)
+    
+        ttk.Label(status_frame, text="Status: ", font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=5)
+        self.status_var = tk.StringVar(value="Ready")
+        status_label = ttk.Label(status_frame, textvariable=self.status_var, font=('Arial', 9))
+        status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
     def _start_acquisition(self):
         """Start data acquisition."""
         self.data_acquisition.start_acquisition()
