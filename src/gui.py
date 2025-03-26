@@ -98,16 +98,17 @@ class DigitalTwinGUI:
         
         self._apply_custom_style()
         
-        # Create main container
-        self.main_container = ttk.Frame(self.root, padding="10", style="TFrame")
+        
+        self.main_container = ttk.Frame(self.root, padding="15", style="TFrame")
         self.main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        # Configure grid weights
+        
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         self.main_container.columnconfigure(0, weight=1)
         self.main_container.columnconfigure(1, weight=3)  # Display area gets more space
         self.main_container.rowconfigure(0, weight=1)
+
 
         
         # Create control panel
@@ -125,103 +126,229 @@ class DigitalTwinGUI:
         self.update_thread.start()
     
     def _apply_custom_style(self):
-        """Apply a custom purple and grey theme to the GUI."""
+        """Apply a custom purple and grey theme to the GUI with enhanced styling."""
         style = ttk.Style()
     
         # Define colors
         primary_color = "#6a1b9a"  # Deep purple
         secondary_color = "#9c27b0"  # Purple
         accent_color = "#d1c4e9"  # Light purple
-        text_color = "#f5f5f5"  # Light grey
+        text_color = "#212121"  # Dark text (almost black)
+        light_text = "#f5f5f5"  # Light text
         bg_color = "#424242"  # Dark grey
         frame_bg = "#616161"  # Medium grey
+        highlight_color = "#ce93d8"  # Light purple highlight
     
         # Configure the theme
         style.configure("TFrame", background=frame_bg)
-        style.configure("TLabelframe", background=frame_bg)
-        style.configure("TLabelframe.Label", foreground=text_color, background=primary_color, font=('Arial', 10, 'bold'))
     
-        style.configure("TLabel", foreground=text_color, background=frame_bg, font=('Arial', 9))
-        style.configure("TButton", foreground=text_color, background=secondary_color, font=('Arial', 9, 'bold'))
+        # Create fancy labelframe style with boxed headings
+        style.configure("TLabelframe", background=frame_bg, borderwidth=2, relief="groove")
+        style.configure("TLabelframe.Label", 
+                foreground=light_text, 
+                background=primary_color, 
+                font=('Arial', 10, 'bold'),
+                padding=(10, 5),
+                relief="raised",
+                borderwidth=1)
+    
+        # Regular labels
+        style.configure("TLabel", foreground=light_text, background=frame_bg, font=('Arial', 9))
+    
+        # Section heading style
+        style.configure("Heading.TLabel", 
+                foreground=light_text, 
+                background=secondary_color, 
+                font=('Arial', 10, 'bold'),
+                padding=(5, 3),
+                relief="raised",
+                borderwidth=1)
+    
+        # Button styles with black text and hover effects
+        style.configure("TButton", 
+                foreground=text_color, 
+                background=accent_color, 
+                font=('Arial', 9, 'bold'),
+                relief="raised",
+                borderwidth=2,
+                padding=(10, 5))
+    
+        # Map hover and pressed states
         style.map("TButton",
             foreground=[('pressed', text_color), ('active', text_color)],
-            background=[('pressed', primary_color), ('active', secondary_color)])
+            background=[('pressed', "#b39ddb"), ('active', highlight_color)],
+            relief=[('pressed', 'sunken'), ('active', 'raised')],
+            borderwidth=[('active', 3)])
     
-        style.configure("TEntry", foreground=bg_color, fieldbackground=accent_color, font=('Arial', 9))
+        # Entry fields
+        style.configure("TEntry", 
+                foreground=text_color, 
+                fieldbackground=accent_color, 
+                font=('Arial', 9),
+                borderwidth=2,
+                relief="sunken")
     
         # Configure the main window
         self.root.configure(background=bg_color)
     
         # Create a custom style for the control panel
-        style.configure("Control.TLabelframe", background=frame_bg)
-        style.configure("Control.TLabelframe.Label", foreground=text_color, background=primary_color, 
-                font=('Arial', 11, 'bold'))
+        style.configure("Control.TLabelframe", 
+                background=frame_bg, 
+                padding=10,
+                borderwidth=3,
+                relief="ridge")
     
-        # Create a custom style for the display area
-        style.configure("Display.TLabelframe", background=frame_bg)
-        style.configure("Display.TLabelframe.Label", foreground=text_color, background=primary_color, 
-                font=('Arial', 11, 'bold'))
+        style.configure("Control.TLabelframe.Label", 
+                foreground=light_text, 
+                background=primary_color, 
+                font=('Arial', 11, 'bold'),
+                padding=(15, 5),
+                relief="raised")
     
-        # Create a custom style for buttons
-        style.configure("Start.TButton", foreground=text_color, background="#4caf50", font=('Arial', 9, 'bold'))
+        
+        style.configure("Display.TLabelframe", 
+                background=frame_bg, 
+                padding=10,
+                borderwidth=3,
+                relief="ridge")
+    
+        style.configure("Display.TLabelframe.Label", 
+                foreground=light_text, 
+                background=primary_color, 
+                font=('Arial', 11, 'bold'),
+                padding=(15, 5),
+                relief="raised")
+
+    
+        style.configure("Start.TButton", 
+                foreground=text_color, 
+                background="#a5d6a7",  # Light green
+                font=('Arial', 9, 'bold'),
+                padding=(10, 5),
+                relief="raised",
+                borderwidth=2)
+    
         style.map("Start.TButton",
-            foreground=[('pressed', text_color), ('active', text_color)],
-            background=[('pressed', "#388e3c"), ('active', "#66bb6a")])
+                foreground=[('pressed', text_color), ('active', text_color)],
+                background=[('pressed', "#81c784"), ('active', "#c8e6c9")],
+                relief=[('pressed', 'sunken'), ('active', 'raised')],
+                borderwidth=[('active', 3)])
     
-        style.configure("Stop.TButton", foreground=text_color, background="#f44336", font=('Arial', 9, 'bold'))
+    
+        style.configure("Stop.TButton", 
+                foreground=text_color, 
+                background="#ef9a9a",  # Light red
+                font=('Arial', 9, 'bold'),
+                padding=(10, 5),
+                relief="raised",
+                borderwidth=2)
+    
         style.map("Stop.TButton",
-            foreground=[('pressed', text_color), ('active', text_color)],
-            background=[('pressed', "#d32f2f"), ('active', "#e57373")])
+                foreground=[('pressed', text_color), ('active', text_color)],
+                background=[('pressed', "#e57373"), ('active', "#ffcdd2")],
+                relief=[('pressed', 'sunken'), ('active', 'raised')],
+                borderwidth=[('active', 3)])
     
-        style.configure("Model.TButton", foreground=text_color, background=secondary_color, font=('Arial', 9, 'bold'))
+    
+        style.configure("Model.TButton", 
+                foreground=text_color, 
+                background="#ce93d8",  # Light purple
+                font=('Arial', 9, 'bold'),
+                padding=(10, 5),
+                relief="raised",
+                borderwidth=2)
+    
         style.map("Model.TButton",
-            foreground=[('pressed', text_color), ('active', text_color)],
-            background=[('pressed', primary_color), ('active', "#ba68c8")])
+                foreground=[('pressed', text_color), ('active', text_color)],
+                background=[('pressed', "#ba68c8"), ('active', "#e1bee7")],
+                relief=[('pressed', 'sunken'), ('active', 'raised')],
+                borderwidth=[('active', 3)])
+
     def _create_control_panel(self):
         """Create the control panel with buttons and inputs."""
-        control_frame = ttk.LabelFrame(self.main_container, text="Control Panel", padding="10", style="Control.TLabelframe")
-        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
+        control_frame = ttk.LabelFrame(self.main_container, text="Control Panel", style="Control.TLabelframe")
+        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=12, pady=12)
     
-        # Data acquisition controls
-        ttk.Label(control_frame, text="Data Acquisition", font=('Arial', 10, 'bold')).grid(row=0, column=0, columnspan=2, pady=8)
-        self.start_button = ttk.Button(control_frame, text="Start Acquisition", 
+    
+        inner_frame = ttk.Frame(control_frame, style="TFrame", padding=(10, 10, 10, 10))
+        inner_frame.pack(fill=tk.BOTH, expand=True)
+    
+    
+        section_frame1 = ttk.Frame(inner_frame, style="TFrame")
+        section_frame1.pack(fill=tk.X, pady=(0, 15))
+    
+        heading1 = ttk.Label(section_frame1, text="Data Acquisition", style="Heading.TLabel")
+        heading1.pack(fill=tk.X, pady=(0, 8))
+    
+        button_frame1 = ttk.Frame(section_frame1, style="TFrame")
+        button_frame1.pack(fill=tk.X)
+    
+        self.start_button = ttk.Button(button_frame1, text="Start Acquisition", 
                                 command=self._start_acquisition, style="Start.TButton")
-        self.start_button.grid(row=1, column=0, padx=5, pady=5)
+        self.start_button.pack(side=tk.LEFT, padx=5, pady=5, expand=True, fill=tk.X)
     
-        self.stop_button = ttk.Button(control_frame, text="Stop Acquisition", 
+        self.stop_button = ttk.Button(button_frame1, text="Stop Acquisition", 
                                 command=self._stop_acquisition, state=tk.DISABLED, style="Stop.TButton")
-        self.stop_button.grid(row=1, column=1, padx=5, pady=5)
+        self.stop_button.pack(side=tk.LEFT, padx=5, pady=5, expand=True, fill=tk.X)
     
-        # Model controls
-        ttk.Label(control_frame, text="Model Controls", font=('Arial', 10, 'bold')).grid(row=2, column=0, columnspan=2, pady=8)
-        self.load_model_button = ttk.Button(control_frame, text="Load Models", 
+ 
+        section_frame2 = ttk.Frame(inner_frame, style="TFrame")
+        section_frame2.pack(fill=tk.X, pady=(0, 15))
+    
+        heading2 = ttk.Label(section_frame2, text="Model Controls", style="Heading.TLabel")
+        heading2.pack(fill=tk.X, pady=(0, 8))
+    
+        self.load_model_button = ttk.Button(section_frame2, text="Load Models", 
                                     command=self._load_models, style="Model.TButton")
-        self.load_model_button.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
+        self.load_model_button.pack(fill=tk.X, padx=5, pady=5)
     
-        # Add Run Hybrid Model button here
-        self.run_model_button = ttk.Button(control_frame, text="Run Hybrid Model", 
+    
+        self.run_model_button = ttk.Button(section_frame2, text="Run Hybrid Model", 
                                     command=self._run_hybrid_model, style="Model.TButton")
-        self.run_model_button.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
+        self.run_model_button.pack(fill=tk.X, padx=5, pady=5)
     
-        # SHPB parameters
-        ttk.Label(control_frame, text="SHPB Parameters", font=('Arial', 10, 'bold')).grid(row=5, column=0, columnspan=2, pady=8)
+    
+        section_frame3 = ttk.Frame(inner_frame, style="TFrame")
+        section_frame3.pack(fill=tk.X)
+    
+        heading3 = ttk.Label(section_frame3, text="SHPB Parameters", style="Heading.TLabel")
+        heading3.pack(fill=tk.X, pady=(0, 8))
+    
+        params_frame = ttk.Frame(section_frame3, style="TFrame")
+        params_frame.pack(fill=tk.X)
+    
         self.param_entries = {}
         params = ['E_bar', 'A_bar', 'A_specimen', 'L_specimen', 'c0', 'static_strength', 'L_bar', 'k']
+    
         for i, param in enumerate(params):
-            ttk.Label(control_frame, text=param).grid(row=6+i, column=0, padx=5, pady=3, sticky=tk.W)
-            self.param_entries[param] = ttk.Entry(control_frame)
-            self.param_entries[param].grid(row=6+i, column=1, padx=5, pady=3, sticky=(tk.W, tk.E))
+            param_frame = ttk.Frame(params_frame, style="TFrame")
+            param_frame.pack(fill=tk.X, pady=3)
+
+            ttk.Label(param_frame, text=param).pack(side=tk.LEFT, padx=(5, 10), pady=2)
+            self.param_entries[param] = ttk.Entry(param_frame)
+            self.param_entries[param].pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=5, pady=2)
+        for i, param in enumerate(params):
+            param_frame = ttk.Frame(params_frame, style="TFrame")
+            param_frame.pack(fill=tk.X, pady=3)
+        
+            ttk.Label(param_frame, text=param).pack(side=tk.LEFT, padx=(5, 10), pady=2)
+            self.param_entries[param] = ttk.Entry(param_frame)
+            self.param_entries[param].pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=5, pady=2)
 
     def _create_display_area(self):
         """Create the display area with plots and status."""
-        display_frame = ttk.LabelFrame(self.main_container, text="Display Area", padding="10", style="Display.TLabelframe")
-        display_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
+        display_frame = ttk.LabelFrame(self.main_container, text="Display Area", style="Display.TLabelframe")
+        display_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=12, pady=12)
     
-        # Create matplotlib figure with custom styling
-        plt.style.use('dark_background')  # Use dark background for plots
+    
+        inner_frame = ttk.Frame(display_frame, style="TFrame", padding=(10, 10, 10, 10))
+        inner_frame.pack(fill=tk.BOTH, expand=True)
+    
+   
+        plt.style.use('dark_background') 
         self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(8, 8), facecolor='#424242')
     
-        # Customize plot appearance
+    
         for ax in [self.ax1, self.ax2]:
             ax.set_facecolor('#616161')  # Set plot background
             ax.tick_params(colors='#f5f5f5')  # Set tick colors
@@ -234,17 +361,32 @@ class DigitalTwinGUI:
             ax.spines['right'].set_color('#9c27b0')
             ax.grid(True, linestyle='--', alpha=0.7, color='#9e9e9e')
     
-        self.canvas = FigureCanvasTkAgg(self.fig, master=display_frame)
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
     
-        # Status display with custom styling
-        status_frame = ttk.Frame(display_frame, style="TFrame")
+        plot_frame = ttk.Frame(inner_frame, style="TFrame", borderwidth=2, relief="groove")
+        plot_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+    
+        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+    
+        status_frame = ttk.Frame(inner_frame, style="TFrame", borderwidth=2, relief="groove")
         status_frame.pack(fill=tk.X, pady=5)
     
-        ttk.Label(status_frame, text="Status: ", font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=5)
+        status_label_frame = ttk.Frame(status_frame, style="TFrame", padding=(5, 5, 5, 5))
+        status_label_frame.pack(fill=tk.X)
+    
+        ttk.Label(status_label_frame, text="Status:", 
+            font=('Arial', 9, 'bold'), 
+            foreground="#f5f5f5").pack(side=tk.LEFT, padx=5)
+    
         self.status_var = tk.StringVar(value="Ready")
-        status_label = ttk.Label(status_frame, textvariable=self.status_var, font=('Arial', 9))
-        status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        status_label = ttk.Label(status_label_frame, 
+                            textvariable=self.status_var, 
+                            font=('Arial', 9),
+                            foreground="#f5f5f5")
+        status_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+   
+    
 
     def _start_acquisition(self):
         """Start data acquisition."""
