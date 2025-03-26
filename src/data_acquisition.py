@@ -7,6 +7,7 @@ import logging
 from typing import List, Dict, Optional
 import threading
 from queue import Queue
+import os
 
 class DataAcquisition:
     def __init__(self, config_path='config.yaml'):
@@ -25,11 +26,17 @@ class DataAcquisition:
         self.is_running = False
         self.data_queue = Queue()
         
+        # Create logs directory if it doesn't exist
+        logs_dir = self.config['paths']['logs_dir']
+        if not os.path.isabs(logs_dir):
+            logs_dir = os.path.join(os.path.dirname(__file__), logs_dir)
+        os.makedirs(logs_dir, exist_ok=True)
+        
         # Setup logging
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
-            filename=self.config['paths']['logs_dir'] + '/data_acquisition.log'
+            filename=os.path.join(logs_dir, 'data_acquisition.log')
         )
     
     def start_acquisition(self):
