@@ -208,9 +208,9 @@ class DigitalTwinGUI:
         self.param_entries = {}
         params = ['E_bar', 'A_bar', 'A_specimen', 'L_specimen', 'c0', 'static_strength', 'L_bar', 'k']
         for i, param in enumerate(params):
-        ttk.Label(control_frame, text=param).grid(row=6+i, column=0, padx=5, pady=3, sticky=tk.W)
-        self.param_entries[param] = ttk.Entry(control_frame)
-        self.param_entries[param].grid(row=6+i, column=1, padx=5, pady=3, sticky=(tk.W, tk.E))
+            ttk.Label(control_frame, text=param).grid(row=6+i, column=0, padx=5, pady=3, sticky=tk.W)
+            self.param_entries[param] = ttk.Entry(control_frame)
+            self.param_entries[param].grid(row=6+i, column=1, padx=5, pady=3, sticky=(tk.W, tk.E))
 
     def _create_display_area(self):
         """Create the display area with plots and status."""
@@ -223,16 +223,16 @@ class DigitalTwinGUI:
     
         # Customize plot appearance
         for ax in [self.ax1, self.ax2]:
-        ax.set_facecolor('#616161')  # Set plot background
-        ax.tick_params(colors='#f5f5f5')  # Set tick colors
-        ax.xaxis.label.set_color('#f5f5f5')  # Set x-axis label color
-        ax.yaxis.label.set_color('#f5f5f5')  # Set y-axis label color
-        ax.title.set_color('#f5f5f5')  # Set title color
-        ax.spines['bottom'].set_color('#9c27b0')  # Set axis color
-        ax.spines['top'].set_color('#9c27b0')
-        ax.spines['left'].set_color('#9c27b0')
-        ax.spines['right'].set_color('#9c27b0')
-        ax.grid(True, linestyle='--', alpha=0.7, color='#9e9e9e')
+            ax.set_facecolor('#616161')  # Set plot background
+            ax.tick_params(colors='#f5f5f5')  # Set tick colors
+            ax.xaxis.label.set_color('#f5f5f5')  # Set x-axis label color
+            ax.yaxis.label.set_color('#f5f5f5')  # Set y-axis label color
+            ax.title.set_color('#f5f5f5')  # Set title color
+            ax.spines['bottom'].set_color('#9c27b0')  # Set axis color
+            ax.spines['top'].set_color('#9c27b0')
+            ax.spines['left'].set_color('#9c27b0')
+            ax.spines['right'].set_color('#9c27b0')
+            ax.grid(True, linestyle='--', alpha=0.7, color='#9e9e9e')
     
         self.canvas = FigureCanvasTkAgg(self.fig, master=display_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
