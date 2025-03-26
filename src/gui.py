@@ -96,6 +96,8 @@ class DigitalTwinGUI:
         self.root.title("SHPB Digital Twin")
         self.root.geometry("1200x800")
         
+        self._apply_custom_style()
+        
         # Create main container
         self.main_container = ttk.Frame(self.root, padding="10")
         self.main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -114,6 +116,59 @@ class DigitalTwinGUI:
         self.update_thread = threading.Thread(target=self._update_loop)
         self.update_thread.start()
     
+    def _apply_custom_style(self):
+        """Apply a custom purple and grey theme to the GUI."""
+        style = ttk.Style()
+    
+        # Define colors
+        primary_color = "#6a1b9a"  # Deep purple
+        secondary_color = "#9c27b0"  # Purple
+        accent_color = "#d1c4e9"  # Light purple
+        text_color = "#f5f5f5"  # Light grey
+        bg_color = "#424242"  # Dark grey
+        frame_bg = "#616161"  # Medium grey
+    
+        # Configure the theme
+        style.configure("TFrame", background=frame_bg)
+        style.configure("TLabelframe", background=frame_bg)
+        style.configure("TLabelframe.Label", foreground=text_color, background=primary_color, font=('Arial', 10, 'bold'))
+    
+        style.configure("TLabel", foreground=text_color, background=frame_bg, font=('Arial', 9))
+        style.configure("TButton", foreground=text_color, background=secondary_color, font=('Arial', 9, 'bold'))
+        style.map("TButton",
+            foreground=[('pressed', text_color), ('active', text_color)],
+            background=[('pressed', primary_color), ('active', secondary_color)])
+    
+        style.configure("TEntry", foreground=bg_color, fieldbackground=accent_color, font=('Arial', 9))
+    
+        # Configure the main window
+        self.root.configure(background=bg_color)
+    
+        # Create a custom style for the control panel
+        style.configure("Control.TLabelframe", background=frame_bg)
+        style.configure("Control.TLabelframe.Label", foreground=text_color, background=primary_color, 
+                font=('Arial', 11, 'bold'))
+    
+        # Create a custom style for the display area
+        style.configure("Display.TLabelframe", background=frame_bg)
+        style.configure("Display.TLabelframe.Label", foreground=text_color, background=primary_color, 
+                font=('Arial', 11, 'bold'))
+    
+    # Create a custom style for buttons
+        style.configure("Start.TButton", foreground=text_color, background="#4caf50", font=('Arial', 9, 'bold'))
+        style.map("Start.TButton",
+            foreground=[('pressed', text_color), ('active', text_color)],
+            background=[('pressed', "#388e3c"), ('active', "#66bb6a")])
+    
+        style.configure("Stop.TButton", foreground=text_color, background="#f44336", font=('Arial', 9, 'bold'))
+        style.map("Stop.TButton",
+            foreground=[('pressed', text_color), ('active', text_color)],
+            background=[('pressed', "#d32f2f"), ('active', "#e57373")])
+    
+        style.configure("Model.TButton", foreground=text_color, background=secondary_color, font=('Arial', 9, 'bold'))
+        style.map("Model.TButton",
+            foreground=[('pressed', text_color), ('active', text_color)],
+            background=[('pressed', primary_color), ('active', "#ba68c8")])
     def _create_control_panel(self):
    
         control_frame = ttk.LabelFrame(self.main_container, text="Control Panel", padding="5")
